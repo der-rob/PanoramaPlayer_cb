@@ -7,7 +7,7 @@ void PPlayerApp::setup(){
 	ofEnableDepthTest();
     ofDisableArbTex();
     ofSetFrameRate(30);
-    ofSetFullscreen(true);
+    //ofSetFullscreen(true);
 
 	//init variables
 	h = 100;
@@ -32,60 +32,77 @@ void PPlayerApp::setup(){
 
 	//Arduino stuff
 	potValue = "N/A";
-    ofSerial serial;
+
     serial.listDevices();
     vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
-    arduino.connect(deviceList[0].getDeviceName(),57600);
-
-	ofAddListener(arduino.EInitialized, this, &PPlayerApp::setupArduino);
-	bArduinoSetup = false;
+    serial.setup(deviceList[0].getDeviceName(),9600);
 }
 
 //--------------------------------------------------------------
 void PPlayerApp::update(){
 	 camera.setFov(fov);
-	 updateArduino();
+	 updateSerial();
 }
 
 //--------------------------------------------------------------
-void PPlayerApp::setupArduino(const int &version) {
-	cout << "setting up arduino" << endl;
-	//ofRemoveListener(arduino.EInitialized, this, &PPlayerApp::setupArduino);
-	bArduinoSetup = true;
-
-	ofLogNotice() << arduino.getFirmwareName();
-	ofLogNotice() << "firmata v" << arduino.getMajorFirmwareVersion() << "." << arduino.getMinorFirmwareVersion();
-
-	//arduino smoothing
-	index = total = average = 0;
-	for (int thisReading = 0; thisReading < numReadings; thisReading++)
-		readings[thisReading] = 0;
-
-	arduino.sendAnalogPinReporting(0, ARD_ANALOG);
-	arduino.sendDigitalPinMode(7,ARD_INPUT);
-	arduino.sendDigitalPinMode(8,ARD_INPUT);
-
-	ofAddListener(arduino.EAnalogPinChanged, this, &PPlayerApp::analogPinChanged);
-	ofAddListener(arduino.EDigitalPinChanged, this, &PPlayerApp::digitalPinChanged);
+string PPlayerApp::ofxTrimStringRight(string str) {
+    size_t endpos = str.find_last_not_of(" \t\r\n");
+    return (string::npos != endpos) ? str.substr( 0, endpos+1) : str;
 }
-
+// trim trailing spaces
+string PPlayerApp::ofxTrimStringLeft(string str) {
+    size_t startpos = str.find_first_not_of(" \t\r\n");
+    return (string::npos != startpos) ? str.substr(startpos) : str;
+}
+string PPlayerApp::ofxTrimString(string str) {
+    return ofxTrimStringLeft(ofxTrimStringRight(str));
+}
+string PPlayerApp::ofxGetSerialString(ofSerial &the_serial, char until) {
+    static string str;
+    stringstream ss;
+    char ch;
+    int ttl=1000;
+    ch=the_serial.readByte();
+    while (ch > 0 && ttl >= 0 && ch!=until) {
+        ss << ch;
+        ch=the_serial.readByte();
+    }
+    str+=ss.str();
+    if (ch==until) {
+        string tmp=str;
+        str="";
+        return ofxTrimString(tmp);
+    } else {
+        return "";
+    }
+}
 //--------------------------------------------------------------
-void PPlayerApp::updateArduino() {
-	arduino.update();
+void PPlayerApp::updateSerial() {
+    int sensorValue, button1, button2;
+
+    // Receive String from Arduino
+
+    string str;
+    string substring;
+    do {
+        str = ofxGetSerialString(serial,'\n');
+        //read until end of line
+        if (str=="") continue;
+
+        for(int i = 0; i < str.length(); i++) {
+            printf("%c",str[i]);
+        }
+        printf("\n");
+        size_t pos = str.find_first_of(',');
+		substring = str.substr(0, pos);
+//		if (substring.size() > 0) {
+			sensorValue = atoi(substring.c_str());
+			cout << sensorValue << endl;
+			rotation = ofMap(sensorValue,0,1023,0,360);
+//		}
+    } while (str!="");
 }
 
-//--------------------------------------------------------------
-void PPlayerApp::analogPinChanged(const int & pinNum) {
-	total = total - readings[index];
-	readings[index] = arduino.getAnalog(pinNum);
-	total = total + readings[index];
-	index++;
-	index = index % numReadings;
-	average = total / numReadings;
-
-	potValue = ofToString(average);
-	rotation = ofMap(average, 0, 1023, 30, 330);
-}
 //--------------------------------------------------------------
 void PPlayerApp::digitalPinChanged(const int & pinNum) {
 	//since every button press means two changes on the pin, we need to differentiate between press and release
@@ -97,7 +114,6 @@ void PPlayerApp::digitalPinChanged(const int & pinNum) {
 	{
 	case 7:
 		if (arduino.getDigital(pinNum) == ARD_HIGH) {
-		cout << ofToString(ofGetElapsedTimeMillis()) << ": " << pinNum << " | pressed" << endl;
 		ofToggleFullscreen();
 		}
 		break;

@@ -38,12 +38,19 @@ private:
     float rotation;
     float rotation_step;
 
-	ofArduino arduino;
+	ofSerial serial;
+    ofArduino arduino;
+
+    string ofxTrimStringRight(string str);
+    string ofxTrimStringLeft(string str);
+    string ofxTrimString(string str);
+    string ofxGetSerialString(ofSerial &the_serial, char until);
+
+    unsigned char buf[15];
 	bool bArduinoSetup;
 	void setupArduino(const int & version);
     void digitalPinChanged(const int & pinNum);
-    void analogPinChanged(const int & pinNum);
-	void updateArduino();
+    void updateSerial();
 
     string buttonState;
     string potValue;
