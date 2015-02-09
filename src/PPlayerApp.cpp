@@ -2,46 +2,40 @@
 
 //--------------------------------------------------------------
 void PPlayerApp::setup(){
+    vsync = false;
+    ofBackground(0, 0, 0);
+	ofEnableDepthTest();
+    ofDisableArbTex();
+    ofSetFrameRate(30);
+    ofSetFullscreen(true);
+
 	//init variables
 	h = 100;
 	x = y = z = -100;
-	width = height = length = 400;
-
-	fov = 90.0f;
-
+	width = height = length = 16000;
+	fov = 70.0f;
 	rotation = 0.0f;
     rotation_step = 1.0f;
-
-	center.set(ofGetWidth()*.5, ofGetHeight()*.5, 0);
-
-    ofDisableArbTex();
-    ofEnableDepthTest();
+	center.set(0,0, 0);
+    x = -width/2;
+    y = -height/2;
+    z = -length/2;
 
     //initial loading of all textures
 	texture_index = 0;
 	scanTextureFolder();
 
-    //ofEnableTextureEdgeHack();
-
-    glCullFace(GL_BACK);
-
-    width = height = length = 16000;
-
-//    ofAddListener(powermate.tengoInfo, this, &panoGLApp::powermateEvent);
     camera.setGlobalPosition(0.0f, 0.0f, 0.0f);
     camera.setFarClip(32000);
     camera.setFov(fov);
     camera.disableMouseInput();
 
-    center.set(0,0, 0);
-    x = -width/2;
-    y = -height/2;
-    z = -length/2;
-
 	//Arduino stuff
 	potValue = "N/A";
-
-	arduino.connect("COM5", 57600);
+    ofSerial serial;
+    serial.listDevices();
+    vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
+    arduino.connect(deviceList[0].getDeviceName(),57600);
 
 	ofAddListener(arduino.EInitialized, this, &PPlayerApp::setupArduino);
 	bArduinoSetup = false;
@@ -206,7 +200,8 @@ void PPlayerApp::draw(){
         msg += "Rotation \t\t" + ofToString(rotation) + "\n";
         msg += "Rotation step \t\t " + ofToString(rotation_step) + "\n";
         msg += "Potentiometer \t\t " + potValue + "\n";
-        msg += "Panorama \t\t" + ofToString(texture_index);
+        msg += "Panorama \t\t" + ofToString(texture_index) + "\n";
+        msg += "FPS: \t\t" + ofToString(ofGetFrameRate());
 	} else {
         msg = "No Textures loaded!";
 	}
