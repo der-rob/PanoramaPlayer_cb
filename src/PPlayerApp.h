@@ -2,64 +2,127 @@
 
 #include "ofMain.h"
 
-class PPlayerApp : public ofBaseApp{
-	public:
-		void setup();
-		void update();
-		void draw();
+//PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
+//PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = NULL;
 
-		void keyPressed(int key);
-		void keyReleased(int key);
-		void mouseMoved(int x, int y);
-		void mouseDragged(int x, int y, int button);
-		void mousePressed(int x, int y, int button);
-		void mouseReleased(int x, int y, int button);
-		void windowResized(int w, int h);
-		void dragEvent(ofDragInfo dragInfo);
-		void gotMessage(ofMessage msg);
+class PPlayerApp : public ofBaseApp{
+public:
+	void setup();
+	void update();
+	void draw();
+
+	void keyPressed(int key);
+	void keyReleased(int key);
+	void mouseMoved(int x, int y);
+	void mouseDragged(int x, int y, int button);
+	void mousePressed(int x, int y, int button);
+	void mouseReleased(int x, int y, int button);
+	void windowResized(int w, int h);
+	void dragEvent(ofDragInfo dragInfo);
+	void gotMessage(ofMessage msg);
 
 private:
-    int h, width, height, length;
-    float x, y, z;
+	int h, width, height, length;
+	float x, y, z;
 	bool vsync;
 	ofVec3f center;
 
-	//ofImage **current_panorama;
 	vector<vector <ofImage> > all_panoramas;
-
 	int texture_index;
-
 	void scanTextureFolder();
 	void cycleTextures();
 
-    ofEasyCam camera;
-    float fov;
+	//vector< ofRectangle > viewports;
+	ofImage mask_image;
+	ofRectangle black_fade_mask;
+	bool initViewPorts();
+	bool bViewportsInitialized;
+	ofEasyCam camera;
+	float fov;
+	float fade_factor;
 
-    float rotation;
-    float rotation_step;
+	float rotation;
+	float rotation_step;
 
 	ofSerial serial;
-    ofArduino arduino;
+	ofArduino arduino;
 
-    string ofxTrimStringRight(string str);
-    string ofxTrimStringLeft(string str);
-    string ofxTrimString(string str);
-    string ofxGetSerialString(ofSerial &the_serial, char until);
+	string trimStringRight(string str);
+	string trimStringLeft(string str);
+	string trimString(string str);
+	string getSerialString(ofSerial &the_serial, char until);
 
-    unsigned char buf[15];
+	unsigned char buf[15];
 	bool bArduinoSetup;
-	void setupArduino(const int & version);
-    void digitalPinChanged(const int & pinNum);
-    void updateSerial();
+	void digitalPinChanged(const int & pinNum);
+	void updateSerial();
 
-    string buttonState;
-    string potValue;
+	string buttonState;
+	string potValue;
 
 	//potentiometer smoothing
 	static const int numReadings = 5;
 	int readings[numReadings];
 	int index, total, average;
 
-	int readButtonDebpunced(int pin, long int debounceDelay, ofArduino &ard);
+	
+
+	//////////////
+	//enable vsync
+	//////////////
+	bool IsExtensionSupported( char* szTargetExtension )
+	{
+		const unsigned char *pszExtensions = NULL;
+		const unsigned char *pszStart;
+		unsigned char *pszWhere, *pszTerminator;
+
+		// Extension names should not have spaces
+		pszWhere = (unsigned char *) strchr( szTargetExtension, ' ' );
+		if( pszWhere || *szTargetExtension == '\0' )
+			return false;
+
+		// Get Extensions String
+		pszExtensions = glGetString( GL_EXTENSIONS );
+
+		// Search The Extensions String For An Exact Copy
+		pszStart = pszExtensions;
+		for(;;)
+		{
+			pszWhere = (unsigned char *) strstr( (const char *) pszStart, szTargetExtension );
+			if( !pszWhere )
+				break;
+			pszTerminator = pszWhere + strlen( szTargetExtension );
+			if( pszWhere == pszStart || *( pszWhere - 1 ) == ' ' )
+				if( *pszTerminator == ' ' || *pszTerminator == '\0' )
+					return true;
+			pszStart = pszTerminator;
+		}
+		return false;
+	}
+
+	bool InitVSync()
+	{
+		if (IsExtensionSupported("WGL_EXT_swap_control"))
+		{
+			wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)
+				wglGetProcAddress("wglSwapIntervalEXT");
+			wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)
+				wglGetProcAddress("wglGetSwapIntervalEXT");
+			return true;
+		}
+		return false;// WGL_EXT_swap_control not supported
+	}
+	bool SetVSync(bool VSync)
+	{
+		if(!wglSwapIntervalEXT) return false;
+		wglSwapIntervalEXT(VSync);
+		return true;
+	}
+	bool GetVSync(bool* VSync)
+	{
+		if(!wglGetSwapIntervalEXT) return false;//VSynce value is not valid...
+		*VSync = wglGetSwapIntervalEXT();
+		return true;
+	}
 
 };
