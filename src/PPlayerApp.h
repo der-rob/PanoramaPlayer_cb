@@ -34,6 +34,7 @@ private:
 
 	//vector< ofRectangle > viewports;
 	ofImage mask_image;
+	ofShader shader;
 	ofRectangle black_fade_mask;
 	bool initViewPorts();
 	bool bViewportsInitialized;
@@ -45,6 +46,7 @@ private:
 	float rotation_step;
 
 	ofSerial serial;
+	bool bArduinoReady;
 	ofArduino arduino;
 
 	string trimStringRight(string str);

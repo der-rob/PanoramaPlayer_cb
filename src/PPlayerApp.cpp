@@ -3,13 +3,11 @@
 //--------------------------------------------------------------
 void PPlayerApp::setup(){
 	vsync = false;
+	bArduinoReady = false;
 	ofBackground(0, 0, 0);
 	ofEnableDepthTest();
-	ofEnableAlphaBlending();
 	ofDisableArbTex();
-	//ofSetFrameRate(30);
 	//ofSetFullscreen(true);
-	ofSetVerticalSync(true);
 
 	//init variables
 	h = 100;
@@ -22,9 +20,11 @@ void PPlayerApp::setup(){
 	x = -width/2;
 	y = -height/2;
 	z = -length/2;
-    
+
 	//initViewPorts();
-	
+	shader.load("shaders\\noise.vert","shaders\\noise.frag");
+	ofLogLevel(ofLogVerbose);
+
 	//initial loading of all textures
 	texture_index = 0;
 	scanTextureFolder();
@@ -32,7 +32,7 @@ void PPlayerApp::setup(){
 	mask_image.loadImage("mask.jpg");
 	black_fade_mask = ofRectangle(0,0,ofGetWidth(),ofGetHeight());
 	fade_factor=0.5;
-	
+
 	camera.setGlobalPosition(0.0f, 0.0f, 0.0f);
 	camera.setFarClip(32000);
 	camera.setFov(fov);
@@ -43,7 +43,8 @@ void PPlayerApp::setup(){
 
 	serial.listDevices();
 	vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
-	serial.setup(deviceList[1].getDeviceName(),9600);
+	if (deviceList.size() > 0)
+		bArduinoReady = serial.setup(deviceList[0].getDeviceName(),9600);
 
 	cout << "===" << endl;
 	cout << ofToString(InitVSync()) << endl;
@@ -54,7 +55,8 @@ void PPlayerApp::setup(){
 //--------------------------------------------------------------
 void PPlayerApp::update(){
 	camera.setFov(fov);
-	updateSerial();
+	if (bArduinoReady)
+		updateSerial();
 }
 
 //--------------------------------------------------------------
@@ -92,28 +94,19 @@ string PPlayerApp::getSerialString(ofSerial &the_serial, char until) {
 //--------------------------------------------------------------
 void PPlayerApp::updateSerial() {
 	int sensorValue, button1, button2;
-
 	// Receive String from Arduino
-
 	string str;
 	string substring;
 	do {
-		str = getSerialString(serial,'\n');
-		//read until end of line
+		str = getSerialString(serial,'\n'); //read until end of line
+
 		if (str=="") continue;
-		/*
-		for(int i = 0; i < str.length(); i++) {
-			printf("%c",str[i]);
-		}
-		printf("\n");
-		*/
+
 		size_t pos = str.find_first_of(',');
 		substring = str.substr(0, pos);
 		sensorValue = atoi(substring.c_str());
-		//cout << sensorValue << endl;
 		rotation = ofMap(sensorValue,0,1023,180,270);
 		fade_factor = ofMap(sensorValue,0,1023,0,1);
-		//		}
 	} while (str!="");
 }
 
@@ -151,17 +144,16 @@ void PPlayerApp::digitalPinChanged(const int & pinNum) {
 //--------------------------------------------------------------
 void PPlayerApp::draw(){
 	string msg ="";
-	
-	
 
 	if (texture_index >= 0) {
 		/*
 		for (int v = 0; v < viewports.size(); v++)
 		{*/
 			//camera.begin(viewports[v]);
-			//texture_index = v;	
+			//texture_index = v;
+
 			camera.begin();
-						ofPushMatrix();
+			ofPushMatrix();
 			ofTranslate(center.x, center.y,0);
 			ofRotate(rotation, 0, 1, 0);
 
@@ -230,8 +222,11 @@ void PPlayerApp::draw(){
 			all_panoramas[texture_index][5].getTextureReference().unbind();
 
 			ofPopMatrix();
-			camera.end();			
+			camera.end();
+
 		//}
+		if (!bArduinoReady)
+			msg += "Arduino not ready!\n";
 		msg += "Field of View \t\t" + ofToString(fov) + "\n";
 		msg += "Rotation \t\t" + ofToString(rotation) + "\n";
 		msg += "Rotation step \t\t " + ofToString(rotation_step) + "\n";
@@ -242,16 +237,35 @@ void PPlayerApp::draw(){
 		msg = "No Textures loaded!";
 	}
 
-	//draw a mask
-	glEnable(GL_BLEND);
-	ofMatrixMode(OF_MATRIX_PROJECTION);
-	/*ofPushMatrix();
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glColor4f(0,0,0,fade_factor);
-	ofRect(ofRectangle(0,0,ofGetWidth(),ofGetHeight()););
-	ofPopMatrix();*/
-
 	ofPushMatrix();
+	ofMatrixMode(OF_MATRIX_PROJECTION);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	//shader
+	shader.begin();
+	shader.setUniform1f("border_size",0.01);
+	shader.setUniform1f("disc_radius", 0.5);
+	shader.setUniform4f("disc_color",1.0,1.0,1.0,1.0);
+	shader.setUniform2f("disc_center", 0.5,0.5);
+	shader.setUniform1f("alpha", fade_factor);
+	float aspect_ratio = (float)ofGetWidth() / (float)ofGetHeight();
+	shader.setUniform1f("aspect_ratio", aspect_ratio);
+	//glColor4f(0,0,0,fade_factor);
+	all_panoramas[texture_index][5].getTextureReference().bind();
+	glBegin(GL_QUADS);
+			glTexCoord2f(0.0f, 0.0f); glVertex2f(0, 0);
+			glTexCoord2f(1.0f, 0.0f); glVertex2f(ofGetWidth(), 0);
+			glTexCoord2f(1.0f, 1.0f); glVertex2f(ofGetWidth(), ofGetHeight());
+			glTexCoord2f(0.0f, 1.0f); glVertex2f(0, ofGetHeight());
+			glEnd();
+	all_panoramas[texture_index][5].getTextureReference().unbind();
+	shader.end();
+
+
+	//draw a mask
+	ofPushMatrix();
+	glEnable(GL_BLEND);
 	glBlendFunc(GL_ZERO,GL_SRC_COLOR);
 	mask_image.draw(0.0f, 0.0f, ofGetWidth(), ofGetHeight());
 	ofPopMatrix();
@@ -298,7 +312,7 @@ void PPlayerApp::mouseMoved(int x, int y){
 
 //--------------------------------------------------------------
 void PPlayerApp::mouseDragged(int x, int y, int button){
-
+	//rotation = ofMap(x,0, ofGetWidth(),0,360);
 }
 
 //--------------------------------------------------------------
@@ -407,9 +421,6 @@ void PPlayerApp::scanTextureFolder() {
 	if (all_panoramas.size() >=1)
 		texture_index = 0;
 	else texture_index = -1;
-
-	//	if (all_panoramas.size() > 0)
-	//		current_panorama = (ofImage**) &all_panoramas[texture_index];
 }
 
 //--------------------------------------------------------------
