@@ -3,11 +3,12 @@
 //--------------------------------------------------------------
 void PPlayerApp::setup(){
 	vsync = false;
-	bArduinoReady = false;
+	bControllerConnected = false;
 	ofBackground(0, 0, 0);
 	ofEnableDepthTest();
 	ofDisableArbTex();
-	//ofSetFullscreen(true);
+	ofSetFullscreen(true);
+	show_stats = false;
 
 	//init variables
 	h = 100;
@@ -15,14 +16,15 @@ void PPlayerApp::setup(){
 	width = height = length = 16000;
 	fov = 70.0f;
 	rotation = 0.0f;
-	rotation_step = 1.0f;
 	center.set(0,0, 0);
 	x = -width/2;
 	y = -height/2;
 	z = -length/2;
+	
+	
 
 	//initViewPorts();
-	shader.load("shaders\\noise.vert","shaders\\noise.frag");
+	shader.load("shaders\\binoculars.vert","shaders\\binoculars.frag");
 	ofLogLevel(ofLogVerbose);
 
 	//initial loading of all textures
@@ -38,25 +40,53 @@ void PPlayerApp::setup(){
 	camera.setFov(fov);
 	camera.disableMouseInput();
 
-	//Arduino stuff
-	potValue = "N/A";
-
-	serial.listDevices();
-	vector <ofSerialDeviceInfo> deviceList = serial.getDeviceList();
-	if (deviceList.size() > 0)
-		bArduinoReady = serial.setup(deviceList[0].getDeviceName(),9600);
+	
 
 	cout << "===" << endl;
 	cout << ofToString(InitVSync()) << endl;
 	cout << ofToString(SetVSync(true)) << endl;
 	cout << "===" << endl;
+	
+	//Arduino stuff
+	potValue = "N/A";
+	
+	bControllerConnected = establishControllerConnection(serial); 
 }
-
+//--------------------------------------------------------------
+bool PPlayerApp::establishControllerConnection(ofSerial & _serial) { 
+	//check serial devices
+	//_serial.listDevices();
+	vector <ofSerialDeviceInfo> deviceList = _serial.getDeviceList();
+	//connect to last device in list, should be the mikro controller
+	if (deviceList.size() > 0)
+		if (_serial.setup(deviceList.back().getDeviceName(),9600)) {
+			//check if connected device is panorama controller
+			_serial.writeByte('I');
+			float init_time = ofGetElapsedTimef();
+			//wait for correct answer within specified time
+			bool connected = false;
+			
+			while (!connected)
+			{
+				if (_serial.readByte() == 'R')
+					connected = true;
+				if (ofGetElapsedTimef() - init_time > 2)
+					break;
+			}
+			return true;
+		}
+		else return false;
+}
 //--------------------------------------------------------------
 void PPlayerApp::update(){
 	camera.setFov(fov);
-	if (bArduinoReady)
+	if (bControllerConnected)
 		updateSerial();
+	else
+	{
+		if (ofGetElapsedTimef() - last_conn_try > 1)
+			bControllerConnected = establishControllerConnection(serial);
+	}
 }
 
 //--------------------------------------------------------------
@@ -93,146 +123,169 @@ string PPlayerApp::getSerialString(ofSerial &the_serial, char until) {
 }
 //--------------------------------------------------------------
 void PPlayerApp::updateSerial() {
-	int sensorValue, button1, button2;
+	//check if mc is still online
+	if (ofGetElapsedTimef() - send_request_time > 8) {
+		serial.writeByte('Q');
+		send_request_time = ofGetElapsedTimef();
+		b_responded = false;
+	}
+	if (!b_responded && ofGetElapsedTimef() - send_request_time > 2)
+		bControllerConnected = false;
+
+	char HEADER = 'H';
+	short LF =10;
+	int sensorValue;
 	// Receive String from Arduino
 	string str;
 	string substring;
-	do {
-		str = getSerialString(serial,'\n'); //read until end of line
+	bool new_button1_state = 0;
+	bool new_button2_state = 0;
 
+	do {
+		str = getSerialString(serial, LF); //read until end of line
 		if (str=="") continue;
 
-		size_t pos = str.find_first_of(',');
-		substring = str.substr(0, pos);
-		sensorValue = atoi(substring.c_str());
-		rotation = ofMap(sensorValue,0,1023,180,270);
-		fade_factor = ofMap(sensorValue,0,1023,0,1);
+		vector<string> data = ofSplitString(str, ",");
+		if (data[0] == "H")
+		{
+			sensorValue = ofToInt(data[1]);
+			potValue = data[1];
+			rotation = ofMap(sensorValue,0,1023,180,270);
+
+			new_button1_state = ofToBool(data[2]);
+			new_button2_state = ofToBool(data[3]);
+
+			if (new_button1_state == true && new_button1_state != button_state_1)
+			{
+				cout << "Button 1 pressed" << endl;
+				button1pressed();
+				button_state_1 = new_button1_state;
+			}
+			else if (new_button1_state == false && new_button1_state != button_state_1)
+			{
+				cout << "Button 1 released" << endl;
+				button_state_1 = new_button1_state;
+			}
+			
+			if (new_button2_state == true && new_button2_state != button_state_2)
+			{
+				cout << "Button 2 pressed" << endl;
+				button2pressed();
+				button_state_2 = new_button2_state;
+			}
+			else if (new_button2_state == false && new_button2_state != button_state_2)
+			{
+				cout << "Button 2 released" << endl;
+				button_state_2 = new_button2_state;
+			}
+		}
+		else if (data[0] == "A")
+		{
+			cout << "controller alive!" << endl;
+			b_responded = true;
+			bControllerConnected = true;
+			last_send_q_time = ofGetElapsedTimeMillis() % 65535;
+		}
 	} while (str!="");
 }
 
 //--------------------------------------------------------------
-void PPlayerApp::digitalPinChanged(const int & pinNum) {
-	//since every button press means two changes on the pin, we need to differentiate between press and release
-	//we do that by checking the pinNum for ARD_HIGH or ARD_LOW
-	//ARD_HIGH means pressed
-	//ARD_LOW means released
-
-	switch (pinNum)
-	{
-	case 7:
-		if (arduino.getDigital(pinNum) == ARD_HIGH) {
-			ofToggleFullscreen();
-		}
-		break;
-	case 8:
-		if (arduino.getDigital(pinNum) == ARD_HIGH) {
-			cout << ofToString(ofGetElapsedTimeMillis()) << ": " << pinNum << " | pressed" << endl;
-			cycleTextures();
-			cout << "Texture index: " << texture_index << endl;
-		}
-		break;
-	default:
-		if (arduino.getDigital(pinNum) == ARD_HIGH) {
-			cout << "No action specified for pin " << pinNum << "|pressed." << endl;
-		}
-		else if (arduino.getDigital(pinNum) == ARD_LOW) {
-			cout << "No action specified for pin " << pinNum << "|released." << endl;
-		}
-		break;
-	}
-}
-//--------------------------------------------------------------
 void PPlayerApp::draw(){
 	string msg ="";
-
+	
 	if (texture_index >= 0) {
 		/*
 		for (int v = 0; v < viewports.size(); v++)
 		{*/
-			//camera.begin(viewports[v]);
-			//texture_index = v;
+		//camera.begin(viewports[v]);
+		//texture_index = v;	
 
-			camera.begin();
-			ofPushMatrix();
-			ofTranslate(center.x, center.y,0);
-			ofRotate(rotation, 0, 1, 0);
+		camera.begin();
+		ofPushMatrix();
+		ofTranslate(center.x, center.y,0);
+		ofRotate(rotation, 0, 1, 0);
 
-			all_panoramas[texture_index][0].getTextureReference().bind();
-			all_panoramas[texture_index][0].getTextureReference().unbind();
+		all_panoramas[texture_index][0].getTextureReference().bind();
+		all_panoramas[texture_index][0].getTextureReference().unbind();
 
-			// Draw Front side
-			all_panoramas[texture_index][0].getTextureReference().bind();
+		// Draw Front side
+		all_panoramas[texture_index][0].getTextureReference().bind();
 
-			glBegin(GL_QUADS);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z+length);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z+length);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z+length);
-			glEnd();
-			all_panoramas[texture_index][0].getTextureReference().unbind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z+length);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z+length);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z+length);
+		glEnd();
+		all_panoramas[texture_index][0].getTextureReference().unbind();
 
-			// Draw Back side
-			all_panoramas[texture_index][1].getTextureReference().bind();
-			glBegin(GL_QUADS);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z);
-			glEnd();
-			all_panoramas[texture_index][1].getTextureReference().unbind();
+		// Draw Back side
+		all_panoramas[texture_index][1].getTextureReference().bind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z);
+		glEnd();
+		all_panoramas[texture_index][1].getTextureReference().unbind();
 
-			// Draw up side
-			all_panoramas[texture_index][2].getTextureReference().bind();
-			glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y+height, z+length);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y+height, z+length);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
-			glEnd();
-			all_panoramas[texture_index][2].getTextureReference().unbind();
+		// Draw up side
+		all_panoramas[texture_index][2].getTextureReference().bind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y+height, z+length);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y+height, z+length);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
+		glEnd();
+		all_panoramas[texture_index][2].getTextureReference().unbind();
 
-			// Draw down side
-			all_panoramas[texture_index][3].getTextureReference().bind();
-			glBegin(GL_QUADS);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y, z+length);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y, z+length);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
-			glEnd();
-			all_panoramas[texture_index][4].getTextureReference().unbind();
+		// Draw down side
+		all_panoramas[texture_index][3].getTextureReference().bind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y, z+length);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y, z+length);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
+		glEnd();
+		all_panoramas[texture_index][4].getTextureReference().unbind();
 
-			// Draw Left side
-			all_panoramas[texture_index][4].getTextureReference().bind();
-			glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z+length);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
-			glEnd();
-			all_panoramas[texture_index][4].getTextureReference().unbind();
+		// Draw Left side
+		all_panoramas[texture_index][4].getTextureReference().bind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z+length);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
+		glEnd();
+		all_panoramas[texture_index][4].getTextureReference().unbind();
 
-			// Draw Right side
-			all_panoramas[texture_index][5].getTextureReference().bind();
-			glBegin(GL_QUADS);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z+length);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z+length);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
-			glEnd();
-			all_panoramas[texture_index][5].getTextureReference().unbind();
+		// Draw Right side
+		all_panoramas[texture_index][5].getTextureReference().bind();
+		glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z+length);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z+length);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
+		glEnd();
+		all_panoramas[texture_index][5].getTextureReference().unbind();
 
-			ofPopMatrix();
-			camera.end();
+		ofPopMatrix();
+		camera.end();
 
 		//}
-		if (!bArduinoReady)
-			msg += "Arduino not ready!\n";
-		msg += "Field of View \t\t" + ofToString(fov) + "\n";
-		msg += "Rotation \t\t" + ofToString(rotation) + "\n";
-		msg += "Rotation step \t\t " + ofToString(rotation_step) + "\n";
-		msg += "Potentiometer \t\t " + potValue + "\n";
-		msg += "Panorama \t\t" + ofToString(texture_index) + "\n";
-		msg += "FPS: \t\t" + ofToString(ofGetFrameRate());
+		//show stats and stuff
+		if (show_stats)
+		{
+			//check if controller is connected
+			if (!bControllerConnected)
+				msg += "Sensor controller is not connected!\n";
+
+			msg += "Field of View \t\t" + ofToString(fov) + "\n";
+			msg += "Rotation \t\t" + ofToString(rotation) + "\n";
+			msg += "Potentiometer \t\t " + potValue + "\n";
+			msg += "Panorama \t\t" + ofToString(texture_index) + "\n";
+			msg += "FPS: \t\t" + ofToString(ofGetFrameRate());
+		} 
 	} else {
 		msg = "No Textures loaded!";
 	}
@@ -254,11 +307,11 @@ void PPlayerApp::draw(){
 	//glColor4f(0,0,0,fade_factor);
 	all_panoramas[texture_index][5].getTextureReference().bind();
 	glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex2f(0, 0);
-			glTexCoord2f(1.0f, 0.0f); glVertex2f(ofGetWidth(), 0);
-			glTexCoord2f(1.0f, 1.0f); glVertex2f(ofGetWidth(), ofGetHeight());
-			glTexCoord2f(0.0f, 1.0f); glVertex2f(0, ofGetHeight());
-			glEnd();
+	glTexCoord2f(0.0f, 0.0f); glVertex2f(0, 0);
+	glTexCoord2f(1.0f, 0.0f); glVertex2f(ofGetWidth(), 0);
+	glTexCoord2f(1.0f, 1.0f); glVertex2f(ofGetWidth(), ofGetHeight());
+	glTexCoord2f(0.0f, 1.0f); glVertex2f(0, ofGetHeight());
+	glEnd();
 	all_panoramas[texture_index][5].getTextureReference().unbind();
 	shader.end();
 
@@ -273,18 +326,18 @@ void PPlayerApp::draw(){
 
 	ofDrawBitmapStringHighlight(msg, 50, 50);
 }
-
+//--------------------------------------------------------------
+void PPlayerApp::button1pressed() {
+	cycleTextures();
+}
+//--------------------------------------------------------------
+void PPlayerApp::button2pressed() {
+	ofToggleFullscreen();
+}
 //--------------------------------------------------------------
 void PPlayerApp::keyPressed(int key){
-	if (key == OF_KEY_LEFT)
-	{
-		rotation_step -= 0.1f;
-	}
-	else if (key == OF_KEY_RIGHT)
-	{
-		rotation_step += 0.1f;
-	}
-	else if ( key == OF_KEY_UP )
+
+	if ( key == OF_KEY_UP )
 		fov += 10.0;
 	else if (key == OF_KEY_DOWN)
 		fov -= 10.0f;
@@ -292,12 +345,8 @@ void PPlayerApp::keyPressed(int key){
 		ofToggleFullscreen();
 		//initViewPorts();
 	}
-	else if (key == 'a')
-		rotation -=rotation_step;
-	else if (key == 'd')
-		rotation +=rotation_step;
-	else if (key == 'r')
-		arduino.sendReset();
+	else if (key == 's')
+		show_stats = ! show_stats;
 }
 
 //--------------------------------------------------------------
@@ -432,22 +481,22 @@ void PPlayerApp::cycleTextures(){
 /*
 //--------------------------------------------------------------
 bool PPlayerApp::initViewPorts() {
-	float _width = ofGetWidth();
-	float _height = ofGetHeight();
-	int _x,_y;
-	ofVec2f midpoint;
-	float angle_rad = 72*(PI/180);
-	float radius = _width/(2*tan(angle_rad));
-	midpoint = ofVec2f(_width/2.0, _height + radius);
-	cout << midpoint << endl;
-	// calculate midpoint for pentagon
-	viewports.clear();
-	for (int i = 0; i<5; i++)
-	{
-		ofRectangle rect = ofRectangle(i * _width, 0, _width, _height);
-		viewports.push_back(rect);
-	}
+float _width = ofGetWidth();
+float _height = ofGetHeight();
+int _x,_y;
+ofVec2f midpoint;
+float angle_rad = 72*(PI/180);
+float radius = _width/(2*tan(angle_rad));
+midpoint = ofVec2f(_width/2.0, _height + radius);
+cout << midpoint << endl;
+// calculate midpoint for pentagon
+viewports.clear();
+for (int i = 0; i<5; i++)
+{
+ofRectangle rect = ofRectangle(i * _width, 0, _width, _height);
+viewports.push_back(rect);
+}
 
-	return true;
+return true;
 }
 */

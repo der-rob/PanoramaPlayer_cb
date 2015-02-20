@@ -1,5 +1,4 @@
 #pragma once
-
 #include "ofMain.h"
 
 //PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
@@ -22,10 +21,13 @@ public:
 	void gotMessage(ofMessage msg);
 
 private:
+
+
 	int h, width, height, length;
 	float x, y, z;
 	bool vsync;
 	ofVec3f center;
+	bool show_stats;
 
 	vector<vector <ofImage> > all_panoramas;
 	int texture_index;
@@ -43,11 +45,21 @@ private:
 	float fade_factor;
 
 	float rotation;
-	float rotation_step;
+	
 
 	ofSerial serial;
-	bool bArduinoReady;
-	ofArduino arduino;
+	bool bSerialDeviceReady;
+	bool bControllerConnected;
+	bool establishControllerConnection(ofSerial & _serial);
+	float last_conn_try;
+	int last_send_q_time;
+	bool b_responded;
+	int response_time;
+	float send_request_time;
+
+	bool button_state_1, button_state_2;
+	void button1pressed();
+	void button2pressed();
 
 	string trimStringRight(string str);
 	string trimStringLeft(string str);
@@ -67,7 +79,7 @@ private:
 	int readings[numReadings];
 	int index, total, average;
 
-	
+
 
 	//////////////
 	//enable vsync
