@@ -6,7 +6,7 @@
 		<Option makefile="makefile" />
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
-		<Option virtualFolders="addons\;src\;" />
+		<Option virtualFolders="addons\;" />
 		<Build>
 			<Target title="release">
 				<Option output="bin/$(PROJECT_NAME)" prefix_auto="1" extension_auto="1" />
@@ -118,15 +118,17 @@
 		<Unit filename="icon.rc">
 			<Option compilerVar="WINDRES" />
 		</Unit>
-		<Unit filename="src/PPlayerApp.cpp">
-			<Option virtualFolder="src/" />
-		</Unit>
-		<Unit filename="src/PPlayerApp.h">
-			<Option virtualFolder="src/" />
-		</Unit>
-		<Unit filename="src/main.cpp">
-			<Option virtualFolder="src" />
-		</Unit>
+		<Unit filename="src/Binocular.cpp" />
+		<Unit filename="src/Binocular.h" />
+		<Unit filename="src/PPlayerApp.cpp" />
+		<Unit filename="src/PPlayerApp.h" />
+		<Unit filename="src/PanoramaCube.cpp" />
+		<Unit filename="src/PanoramaCube.h" />
+		<Unit filename="src/SerialControl.cpp" />
+		<Unit filename="src/SerialControl.h" />
+		<Unit filename="src/SimpleAnimatable.cpp" />
+		<Unit filename="src/SimpleAnimatable.h" />
+		<Unit filename="src/main.cpp" />
 		<Extensions>
 			<code_completion />
 			<debugger />

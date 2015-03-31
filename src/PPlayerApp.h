@@ -1,5 +1,9 @@
 #pragma once
 #include "ofMain.h"
+#include "PanoramaCube.h"
+#include "Binocular.h"
+#include "SerialControl.h"
+#include "SimpleAnimatable.h"
 
 //PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 //PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = NULL;
@@ -9,6 +13,7 @@ public:
 	void setup();
 	void update();
 	void draw();
+	void exit();
 
 	void keyPressed(int key);
 	void keyReleased(int key);
@@ -21,66 +26,54 @@ public:
 	void gotMessage(ofMessage msg);
 
 private:
-
-
-	int h, width, height, length;
-	float x, y, z;
-	bool vsync;
+	int width, height, length;  //dimensions of panorama cube
+	float x, y, z;				//position of panorama cube
 	ofVec3f center;
+	PanoramaCube pCube;
+
 	bool show_stats;
+	bool fullscreen;
+	bool loadSettings(string filename);
+	void loadDefaultSettings();
 
 	vector<vector <ofImage> > all_panoramas;
-	int texture_index;
-	void scanTextureFolder();
-	void cycleTextures();
+	unsigned char panorama_index;
+	unsigned char new_panorama_index;
+	bool scanTextureFolder();
+	bool all_textures_loaded;
+	void cycleTextures_up();
+	void cycleTextures_down();
 
-	//vector< ofRectangle > viewports;
-	ofImage mask_image;
-	ofShader shader;
-	ofRectangle black_fade_mask;
-	bool initViewPorts();
-	bool bViewportsInitialized;
+	Binocular binocular;
 	ofEasyCam camera;
-	float fov;
-	float fade_factor;
+	int fov;
+	float rotation_scale;
+	float rotation_offset;
 
-	float rotation;
+	//animations betwen different panoramas
+	SimpleAnimatable animatable;
+	float blending_speed;
 	
+	//movement within the panorama, the viewing direction
+	float viewing_direction;
 
-	ofSerial serial;
-	bool bSerialDeviceReady;
-	bool bControllerConnected;
-	bool establishControllerConnection(ofSerial & _serial);
-	float last_conn_try;
-	int last_send_q_time;
-	bool b_responded;
-	int response_time;
-	float send_request_time;
-
-	bool button_state_1, button_state_2;
-	void button1pressed();
-	void button2pressed();
-
-	string trimStringRight(string str);
-	string trimStringLeft(string str);
-	string trimString(string str);
-	string getSerialString(ofSerial &the_serial, char until);
-
-	unsigned char buf[15];
-	bool bArduinoSetup;
-	void digitalPinChanged(const int & pinNum);
-	void updateSerial();
+	//serial threaded
+	SerialControl serial_control;
+	
+	void button1pressed(bool &state);
+	void button2pressed(bool &state);
+	void sensor_value_changed(int &value);
+	void fade_to(bool &is_black);
+	int last_sensor_value;
+	bool last_recieved_fading_state;
+	bool current_fading_state;
 
 	string buttonState;
 	string potValue;
 
-	//potentiometer smoothing
-	static const int numReadings = 5;
-	int readings[numReadings];
-	int index, total, average;
-
-
-
+	/////////////////////////////
+	//HELPERS
+	/////////////////////////////
 	//////////////
 	//enable vsync
 	//////////////
@@ -126,12 +119,14 @@ private:
 		}
 		return false;// WGL_EXT_swap_control not supported
 	}
+
 	bool SetVSync(bool VSync)
 	{
 		if(!wglSwapIntervalEXT) return false;
 		wglSwapIntervalEXT(VSync);
 		return true;
 	}
+
 	bool GetVSync(bool* VSync)
 	{
 		if(!wglGetSwapIntervalEXT) return false;//VSynce value is not valid...

@@ -1,0 +1,26 @@
+<panorama>
+	<!-- front -->
+	<picture id="0">
+		<name>Panorama_F.jpg</name>
+  </picture>
+  <!-- back -->
+  <picture id="1">
+      <name>Panorama_B.jpg</name>
+  </picture>
+  <!-- top -->
+  <picture id="2">
+    <name>Panorama_T.jpg</name>
+  </picture>
+  <!-- bottom -->
+  <picture id="3">
+    <name>Panorama_C.jpg</name>
+  </picture>
+  <!-- left -->
+  <picture id="4">
+    <name>Panorama_L.jpg</name>
+  </picture>
+  <!-- right -->
+  <picture id="5">
+    <name>Panorama_R.jpg</name>
+  </picture>
+</panorama>

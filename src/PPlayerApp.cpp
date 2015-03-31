@@ -2,348 +2,147 @@
 
 //--------------------------------------------------------------
 void PPlayerApp::setup(){
-	vsync = false;
-	bControllerConnected = false;
 	ofBackground(0, 0, 0);
 	ofEnableDepthTest();
 	ofDisableArbTex();
-	ofSetFullscreen(true);
-	show_stats = false;
 
-	//init variables
-	h = 100;
-	x = y = z = -100;
-	width = height = length = 16000;
-	fov = 70.0f;
-	rotation = 0.0f;
-	center.set(0,0, 0);
-	x = -width/2;
-	y = -height/2;
-	z = -length/2;
-	
-	
+	//load settings from file
+	if (!loadSettings("settings.xml"))
+	{
+		cout << "Something went wrong loading settings. Continue loading defaults." << endl;
+		loadDefaultSettings();
+	}
 
-	//initViewPorts();
-	shader.load("shaders\\binoculars.vert","shaders\\binoculars.frag");
+	ofSetFullscreen(fullscreen);
+	
+	//enabling vsync by hand since oF version is not working correctly
+	InitVSync();
+	SetVSync(true);
+
 	ofLogLevel(ofLogVerbose);
 
-	//initial loading of all textures
-	texture_index = 0;
-	scanTextureFolder();
-	mask_image.allocate(1920,1080, OF_IMAGE_COLOR);
-	mask_image.loadImage("mask.jpg");
-	black_fade_mask = ofRectangle(0,0,ofGetWidth(),ofGetHeight());
-	fade_factor=0.5;
-
+	//init graphics stuff
+	pCube = PanoramaCube(16000, ofVec3f(0,0,0));
 	camera.setGlobalPosition(0.0f, 0.0f, 0.0f);
 	camera.setFarClip(32000);
 	camera.setFov(fov);
 	camera.disableMouseInput();
+	viewing_direction = 0.0f;
 
-	
+	//initial loading of all textures
+	scanTextureFolder();
+	panorama_index = 0;
 
-	cout << "===" << endl;
-	cout << ofToString(InitVSync()) << endl;
-	cout << ofToString(SetVSync(true)) << endl;
-	cout << "===" << endl;
-	
-	//Arduino stuff
+	//init shader stuff
+	binocular = Binocular("shaders\\binoculars.vert","shaders\\binoculars.frag");
+
+	//init controller connection
+	serial_control.setup(115200);
 	potValue = "N/A";
-	
-	bControllerConnected = establishControllerConnection(serial); 
+	last_sensor_value = 0;
+
+	ofAddListener(serial_control.E_button1_pressed, this, &PPlayerApp::button1pressed);
+	ofAddListener(serial_control.E_button2_pressed, this, &PPlayerApp::button2pressed);
+	ofAddListener(serial_control.E_sensor_value_changed, this, &PPlayerApp::sensor_value_changed);
+	ofAddListener(serial_control.E_fade_to_dark, this, &PPlayerApp::fade_to);
 }
+
 //--------------------------------------------------------------
-bool PPlayerApp::establishControllerConnection(ofSerial & _serial) { 
-	//check serial devices
-	//_serial.listDevices();
-	vector <ofSerialDeviceInfo> deviceList = _serial.getDeviceList();
-	//connect to last device in list, should be the mikro controller
-	if (deviceList.size() > 0)
-		if (_serial.setup(deviceList.back().getDeviceName(),9600)) {
-			//check if connected device is panorama controller
-			_serial.writeByte('I');
-			float init_time = ofGetElapsedTimef();
-			//wait for correct answer within specified time
-			bool connected = false;
-			
-			while (!connected)
-			{
-				if (_serial.readByte() == 'R')
-					connected = true;
-				if (ofGetElapsedTimef() - init_time > 2)
-					break;
-			}
-			return true;
-		}
-		else return false;
+void PPlayerApp::exit() {
+	serial_control.stopThread();
 }
+
 //--------------------------------------------------------------
 void PPlayerApp::update(){
-	camera.setFov(fov);
-	if (bControllerConnected)
-		updateSerial();
-	else
+	float dt = ofGetLastFrameTime();
+
+	if (animatable.getAnimation() != NULL)
+		animatable.updateAnimation(dt);
+
+	if (last_recieved_fading_state != current_fading_state && animatable.getAnimation() == NULL)
 	{
-		if (ofGetElapsedTimef() - last_conn_try > 1)
-			bControllerConnected = establishControllerConnection(serial);
-	}
-}
-
-//--------------------------------------------------------------
-string PPlayerApp::trimStringRight(string str) {
-	size_t endpos = str.find_last_not_of(" \t\r\n");
-	return (string::npos != endpos) ? str.substr( 0, endpos+1) : str;
-}
-// trim trailing spaces
-string PPlayerApp::trimStringLeft(string str) {
-	size_t startpos = str.find_first_not_of(" \t\r\n");
-	return (string::npos != startpos) ? str.substr(startpos) : str;
-}
-string PPlayerApp::trimString(string str) {
-	return trimStringLeft(trimStringRight(str));
-}
-string PPlayerApp::getSerialString(ofSerial &the_serial, char until) {
-	static string str;
-	stringstream ss;
-	char ch;
-	int ttl=1000;
-	ch=the_serial.readByte();
-	while (ch > 0 && ttl >= 0 && ch!=until) {
-		ss << ch;
-		ch=the_serial.readByte();
-	}
-	str+=ss.str();
-	if (ch==until) {
-		string tmp=str;
-		str="";
-		return trimString(tmp);
-	} else {
-		return "";
-	}
-}
-//--------------------------------------------------------------
-void PPlayerApp::updateSerial() {
-	//check if mc is still online
-	if (ofGetElapsedTimef() - send_request_time > 8) {
-		serial.writeByte('Q');
-		send_request_time = ofGetElapsedTimef();
-		b_responded = false;
-	}
-	if (!b_responded && ofGetElapsedTimef() - send_request_time > 2)
-		bControllerConnected = false;
-
-	char HEADER = 'H';
-	short LF =10;
-	int sensorValue;
-	// Receive String from Arduino
-	string str;
-	string substring;
-	bool new_button1_state = 0;
-	bool new_button2_state = 0;
-
-	do {
-		str = getSerialString(serial, LF); //read until end of line
-		if (str=="") continue;
-
-		vector<string> data = ofSplitString(str, ",");
-		if (data[0] == "H")
+		if (last_recieved_fading_state && (animatable.getAnimationState() == BRIGHT))
 		{
-			sensorValue = ofToInt(data[1]);
-			potValue = data[1];
-			rotation = ofMap(sensorValue,0,1023,180,270);
-
-			new_button1_state = ofToBool(data[2]);
-			new_button2_state = ofToBool(data[3]);
-
-			if (new_button1_state == true && new_button1_state != button_state_1)
-			{
-				cout << "Button 1 pressed" << endl;
-				button1pressed();
-				button_state_1 = new_button1_state;
-			}
-			else if (new_button1_state == false && new_button1_state != button_state_1)
-			{
-				cout << "Button 1 released" << endl;
-				button_state_1 = new_button1_state;
-			}
-			
-			if (new_button2_state == true && new_button2_state != button_state_2)
-			{
-				cout << "Button 2 pressed" << endl;
-				button2pressed();
-				button_state_2 = new_button2_state;
-			}
-			else if (new_button2_state == false && new_button2_state != button_state_2)
-			{
-				cout << "Button 2 released" << endl;
-				button_state_2 = new_button2_state;
-			}
+			animatable.createAnimation(0.0, 1.0, blending_speed, GO_DARK);
 		}
-		else if (data[0] == "A")
+		else if (!last_recieved_fading_state && (animatable.getAnimationState() == DARK))
 		{
-			cout << "controller alive!" << endl;
-			b_responded = true;
-			bControllerConnected = true;
-			last_send_q_time = ofGetElapsedTimeMillis() % 65535;
+			panorama_index = new_panorama_index;
+			animatable.createAnimation(1.0, 0.0, blending_speed, GO_BRIGHT);
 		}
-	} while (str!="");
+		current_fading_state = last_recieved_fading_state;
+	}
 }
 
 //--------------------------------------------------------------
 void PPlayerApp::draw(){
 	string msg ="";
-	
-	if (texture_index >= 0) {
-		/*
-		for (int v = 0; v < viewports.size(); v++)
-		{*/
-		//camera.begin(viewports[v]);
-		//texture_index = v;	
 
-		camera.begin();
-		ofPushMatrix();
-		ofTranslate(center.x, center.y,0);
-		ofRotate(rotation, 0, 1, 0);
+	camera.begin();
+	pCube.render(all_panoramas[panorama_index], viewing_direction); 
+	camera.end();
 
-		all_panoramas[texture_index][0].getTextureReference().bind();
-		all_panoramas[texture_index][0].getTextureReference().unbind();
-
-		// Draw Front side
-		all_panoramas[texture_index][0].getTextureReference().bind();
-
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z+length);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z+length);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z+length);
-		glEnd();
-		all_panoramas[texture_index][0].getTextureReference().unbind();
-
-		// Draw Back side
-		all_panoramas[texture_index][1].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z);
-		glEnd();
-		all_panoramas[texture_index][1].getTextureReference().unbind();
-
-		// Draw up side
-		all_panoramas[texture_index][2].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y+height, z+length);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y+height, z+length);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
-		glEnd();
-		all_panoramas[texture_index][2].getTextureReference().unbind();
-
-		// Draw down side
-		all_panoramas[texture_index][3].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y, z+length);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y, z+length);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
-		glEnd();
-		all_panoramas[texture_index][4].getTextureReference().unbind();
-
-		// Draw Left side
-		all_panoramas[texture_index][4].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z+length);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
-		glEnd();
-		all_panoramas[texture_index][4].getTextureReference().unbind();
-
-		// Draw Right side
-		all_panoramas[texture_index][5].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z+length);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z+length);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
-		glEnd();
-		all_panoramas[texture_index][5].getTextureReference().unbind();
-
-		ofPopMatrix();
-		camera.end();
-
-		//}
-		//show stats and stuff
+	//show stats and stuff
+	if (panorama_index >= 0) {
 		if (show_stats)
 		{
 			//check if controller is connected
-			if (!bControllerConnected)
-				msg += "Sensor controller is not connected!\n";
+			/*if (!bControllerConnected)
+			msg += "Sensor controller is not connected!\n";*/
 
 			msg += "Field of View \t\t" + ofToString(fov) + "\n";
-			msg += "Rotation \t\t" + ofToString(rotation) + "\n";
+			msg += "viewing_direction \t\t" + ofToString(viewing_direction) + "\n";
 			msg += "Potentiometer \t\t " + potValue + "\n";
-			msg += "Panorama \t\t" + ofToString(texture_index) + "\n";
-			msg += "FPS: \t\t" + ofToString(ofGetFrameRate());
+			msg += "Panorama \t\t" + ofToString((int)panorama_index) + " " + ofToString((int)new_panorama_index) + "\n";
+			msg += "FPS: \t\t" + ofToString(ofGetFrameRate()) + "\n";
+			msg += "Blending Speed: \t\t" + ofToString(blending_speed) + "\n";
+			msg += "Rotation Offset: \t\t" + ofToString(rotation_offset)  + "\n";
+			msg += "Fade value: \t\t" + ofToString(animatable.getValue());
 		} 
 	} else {
 		msg = "No Textures loaded!";
 	}
 
-	ofPushMatrix();
-	ofMatrixMode(OF_MATRIX_PROJECTION);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	//shader
-	shader.begin();
-	shader.setUniform1f("border_size",0.01);
-	shader.setUniform1f("disc_radius", 0.5);
-	shader.setUniform4f("disc_color",1.0,1.0,1.0,1.0);
-	shader.setUniform2f("disc_center", 0.5,0.5);
-	shader.setUniform1f("alpha", fade_factor);
-	float aspect_ratio = (float)ofGetWidth() / (float)ofGetHeight();
-	shader.setUniform1f("aspect_ratio", aspect_ratio);
-	//glColor4f(0,0,0,fade_factor);
-	all_panoramas[texture_index][5].getTextureReference().bind();
-	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 0.0f); glVertex2f(0, 0);
-	glTexCoord2f(1.0f, 0.0f); glVertex2f(ofGetWidth(), 0);
-	glTexCoord2f(1.0f, 1.0f); glVertex2f(ofGetWidth(), ofGetHeight());
-	glTexCoord2f(0.0f, 1.0f); glVertex2f(0, ofGetHeight());
-	glEnd();
-	all_panoramas[texture_index][5].getTextureReference().unbind();
-	shader.end();
-
-
-	//draw a mask
-	ofPushMatrix();
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ZERO,GL_SRC_COLOR);
-	mask_image.draw(0.0f, 0.0f, ofGetWidth(), ofGetHeight());
-	ofPopMatrix();
-	glDisable(GL_BLEND);
+	binocular.set_alpha(animatable.getValue());
+	binocular.render();
 
 	ofDrawBitmapStringHighlight(msg, 50, 50);
 }
 //--------------------------------------------------------------
-void PPlayerApp::button1pressed() {
-	cycleTextures();
+void PPlayerApp::button1pressed(bool &state) {
+	if (animatable.getAnimation() == NULL)
+		cycleTextures_up();
+
 }
 //--------------------------------------------------------------
-void PPlayerApp::button2pressed() {
-	ofToggleFullscreen();
+void PPlayerApp::button2pressed(bool &state) {
+	if (animatable.getAnimation() == NULL)
+		cycleTextures_down();
 }
+void PPlayerApp::sensor_value_changed(int &value) {
+	if (abs(last_sensor_value - value) > 3)
+		last_sensor_value = value;
+
+	viewing_direction = ofMap(last_sensor_value,0,16384,0,360) * rotation_scale + rotation_offset;
+	potValue = ofToString(last_sensor_value);
+}
+
+
 //--------------------------------------------------------------
 void PPlayerApp::keyPressed(int key){
 
-	if ( key == OF_KEY_UP )
-		fov += 10.0;
-	else if (key == OF_KEY_DOWN)
-		fov -= 10.0f;
-	else if ( key == 'f'){
+	if ( key == OF_KEY_UP ) {
+		if (animatable.getAnimation() == NULL) {
+			cycleTextures_up();
+		}
+	}
+	else if (key == OF_KEY_DOWN) {
+		if (animatable.getAnimation() == NULL) {
+			cycleTextures_down();
+		}
+	}
+	else if ( key == 'f') {
 		ofToggleFullscreen();
-		//initViewPorts();
 	}
 	else if (key == 's')
 		show_stats = ! show_stats;
@@ -361,7 +160,7 @@ void PPlayerApp::mouseMoved(int x, int y){
 
 //--------------------------------------------------------------
 void PPlayerApp::mouseDragged(int x, int y, int button){
-	//rotation = ofMap(x,0, ofGetWidth(),0,360);
+	viewing_direction = ofMap(x,0, ofGetWidth(),0,360);
 }
 
 //--------------------------------------------------------------
@@ -390,7 +189,10 @@ void PPlayerApp::dragEvent(ofDragInfo dragInfo){
 }
 
 //--------------------------------------------------------------
-void PPlayerApp::scanTextureFolder() {
+bool PPlayerApp::scanTextureFolder() {
+	//provide some information during the loading process
+	string info = "";
+
 	//get the texture names per folder, get these names from an xml file which has to bee in each folder
 	vector< vector<string> > all_panorama_filenames;
 	string picPath= "picture_data";
@@ -398,6 +200,8 @@ void PPlayerApp::scanTextureFolder() {
 	int picDirSize = picDir.listDir();
 	picDir.sort();
 
+	info += "loading panoramas from " + picDir.getAbsolutePath() + "\n";
+	ofDrawBitmapStringHighlight(info, 800, 300);
 	// go through all files in picture_data directory
 	for (int i = 0; i < picDirSize; i++){
 		//check if entry is directory (the one where the pictures are supossed to be)
@@ -439,7 +243,6 @@ void PPlayerApp::scanTextureFolder() {
 					cout << key_name << " not found!" << endl;
 					cout << "Skip this directory." << endl;
 				}
-
 			} else {
 				// error handling
 				// configfile not found
@@ -451,52 +254,124 @@ void PPlayerApp::scanTextureFolder() {
 	//load the textures
 	if (all_panorama_filenames.size() >= 1) {
 		cout << "Panoramas to load: " << all_panorama_filenames.size() << endl;
+		info += "Panoramas to load: " + ofToString(all_panorama_filenames.size()) + "\n";
+		ofDrawBitmapStringHighlight(info, 800, 300);
 		for (int i = 0; i < all_panorama_filenames.size(); i++) {
 			vector <ofImage> this_panorama;
 			for (int j = 0; j < all_panorama_filenames[i].size(); j++) {
 				ofImage picture;
 				cout << all_panorama_filenames[i][j].c_str() << endl;
-				if (picture.loadImage(all_panorama_filenames[i][j].c_str()))
+				if (picture.loadImage(all_panorama_filenames[i][j].c_str())) {
+					picture.getTextureReference().bind();
+					int tex_target = picture.getTextureReference().getTextureData().textureTarget;
+					glTexParameteri(tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glTexParameteri(tex_target,GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+					glGenerateMipmap(GL_TEXTURE_2D);
+					glTexParameterf( tex_target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 10.0f);
+					picture.getTextureReference().unbind();
 					this_panorama.push_back(picture);
+				}
 			}
 			//only add if all pictures are loaded correctly
 			if (this_panorama.size() == 6)
 			{
 				all_panoramas.push_back(this_panorama);
 				cout << "Loaded " << all_panoramas.size() << endl;
+				info += "Loaded " + ofToString(all_panoramas.size()) + "\n";
+				ofDrawBitmapStringHighlight(info, 800, 300);
 			}
 		}
 	}
-	if (all_panoramas.size() >=1)
-		texture_index = 0;
-	else texture_index = -1;
+	if (all_panoramas.size() >=1) {
+		panorama_index = 0;
+		return true;
+	} else {
+		panorama_index = -1;
+		return false;
+	}
 }
 
 //--------------------------------------------------------------
-void PPlayerApp::cycleTextures(){
-	texture_index++;
+void PPlayerApp::cycleTextures_up(){
+
+	new_panorama_index = panorama_index + 1;
 	//to avoid bad accesses
-	texture_index = texture_index % all_panoramas.size();
-}
-/*
-//--------------------------------------------------------------
-bool PPlayerApp::initViewPorts() {
-float _width = ofGetWidth();
-float _height = ofGetHeight();
-int _x,_y;
-ofVec2f midpoint;
-float angle_rad = 72*(PI/180);
-float radius = _width/(2*tan(angle_rad));
-midpoint = ofVec2f(_width/2.0, _height + radius);
-cout << midpoint << endl;
-// calculate midpoint for pentagon
-viewports.clear();
-for (int i = 0; i<5; i++)
-{
-ofRectangle rect = ofRectangle(i * _width, 0, _width, _height);
-viewports.push_back(rect);
+	new_panorama_index = new_panorama_index % all_panoramas.size();
 }
 
-return true;
+//--------------------------------------------------------------
+void PPlayerApp::cycleTextures_down() {
+	if (panorama_index <= 0)						//to aviod unwanted behavior when going below zero
+		new_panorama_index = all_panoramas.size() - 1;
+	else
+		new_panorama_index = panorama_index - 1;
+
+	//to avoid bad accesses
+	new_panorama_index = new_panorama_index % all_panoramas.size();
 }
-*/
+
+//--------------------------------------------------------------
+void PPlayerApp::fade_to(bool &is_black) {
+	last_recieved_fading_state = is_black;
+}
+
+
+//--------------------------------------------------------------
+bool PPlayerApp::loadSettings(string filename) {
+	ofFile settingsfile;
+	settingsfile.open(filename);
+
+	if (settingsfile.exists())
+	{
+		ofXml settings;
+		ofBuffer buf = settingsfile.readToBuffer();
+		settings.loadFromBuffer(buf.getText());
+				
+		if (settings.setTo("settings"))
+		{
+			/*field of view*/
+			if (settings.exists("field_of_view")) {
+				fov = settings.getIntValue("field_of_view");
+				fov = min(fov, 170);
+				fov = max(fov, 10);
+			} else 
+				fov = 65;
+			/*rotation scale*/
+			if (settings.exists("rotation_scale"))
+				rotation_scale = settings.getFloatValue("rotation_scale");
+			else
+				rotation_scale = 1.0;
+			/* fullsreen */
+			if (settings.exists("fullscreen"))
+				fullscreen = settings.getBoolValue("fullscreen");
+			else
+				fullscreen = true;
+			/*show stats*/
+			if (settings.exists("show_stats"))
+				show_stats = settings.getBoolValue("show_stats");
+			else
+				show_stats = true;
+			/*blending speed*/
+			if (settings.exists("blendings_speed"))
+				blending_speed = settings.getFloatValue("blending_speed");
+			else
+				blending_speed = 4.0;
+			/* rotation offset */
+			if (settings.exists("rotation_offset"))
+				rotation_offset = settings.getFloatValue("rotation_offset");
+			else
+				rotation_offset = 180;
+			return true;
+		}
+	}
+	return false;
+}
+
+//--------------------------------------------------------------
+void PPlayerApp::loadDefaultSettings() {
+	fov = 70;
+	rotation_scale = 1.0;
+	fullscreen = true;
+	show_stats = true;
+	blending_speed = 8.0;
+}
