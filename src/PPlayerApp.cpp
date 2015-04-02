@@ -13,8 +13,18 @@ void PPlayerApp::setup(){
 		loadDefaultSettings();
 	}
 
+	currentTime = currentTime = ofGetHours() * 60 + ofGetMinutes();
+
+	if (currentTime > shutdown_time) {
+        ofLogError() << "shutdown time is set to earlier this day.";
+        ofLogError() << "Please check or disable shutdown timer";
+        ofLogNotice() << "App is going down now.";
+        ofExit();
+    }
+
+
 	ofSetFullscreen(fullscreen);
-	
+
 	//enabling vsync by hand since oF version is not working correctly
 	InitVSync();
 	SetVSync(true);
@@ -49,7 +59,7 @@ void PPlayerApp::setup(){
 
 //--------------------------------------------------------------
 void PPlayerApp::exit() {
-	serial_control.stopThread();
+    serial_control.stopThread();
 }
 
 //--------------------------------------------------------------
@@ -72,6 +82,14 @@ void PPlayerApp::update(){
 		}
 		current_fading_state = last_recieved_fading_state;
 	}
+
+	currentTime = ofGetHours() * 60 + ofGetMinutes();
+	if (use_shutdown_timer)
+        if(currentTime >= shutdown_time)
+        {
+            cout << "Application is going down now." << endl;
+            ofExit();
+        }
 }
 
 //--------------------------------------------------------------
@@ -79,7 +97,7 @@ void PPlayerApp::draw(){
 	string msg ="";
 
 	camera.begin();
-	pCube.render(all_panoramas[panorama_index], viewing_direction); 
+	pCube.render(all_panoramas[panorama_index], viewing_direction);
 	camera.end();
 
 	//show stats and stuff
@@ -91,14 +109,16 @@ void PPlayerApp::draw(){
 			msg += "Sensor controller is not connected!\n";*/
 
 			msg += "Field of View \t\t" + ofToString(fov) + "\n";
-			msg += "viewing_direction \t\t" + ofToString(viewing_direction) + "\n";
-			msg += "Potentiometer \t\t " + potValue + "\n";
+			msg += "viewing_direction \t" + ofToString(viewing_direction) + "\n";
+			msg += "Encoder value \t\t " + potValue + "\n";
 			msg += "Panorama \t\t" + ofToString((int)panorama_index) + " " + ofToString((int)new_panorama_index) + "\n";
-			msg += "FPS: \t\t" + ofToString(ofGetFrameRate()) + "\n";
-			msg += "Blending Speed: \t\t" + ofToString(blending_speed) + "\n";
-			msg += "Rotation Offset: \t\t" + ofToString(rotation_offset)  + "\n";
-			msg += "Fade value: \t\t" + ofToString(animatable.getValue());
-		} 
+			msg += "FPS: \t\t\t" + ofToString(ofGetFrameRate()) + "\n";
+			msg += "Blending Speed: \t" + ofToString(blending_speed) + "\n";
+			msg += "Rotation Offset: \t" + ofToString(rotation_offset)  + "\n";
+			msg += "System Time: \t\t" + ofToString(ofGetHours(),2,'0') + ":" + ofToString(ofGetMinutes(),2,'0') + ":" + ofToString(ofGetSeconds(),2,'0') + "\n";
+			msg += "Shutdown Time int: \t" + ofToString((shutdown_time / 60),2,'0') + ":" + ofToString((shutdown_time % 60), 2, '0') + "\n";
+
+		}
 	} else {
 		msg = "No Textures loaded!";
 	}
@@ -326,7 +346,7 @@ bool PPlayerApp::loadSettings(string filename) {
 		ofXml settings;
 		ofBuffer buf = settingsfile.readToBuffer();
 		settings.loadFromBuffer(buf.getText());
-				
+
 		if (settings.setTo("settings"))
 		{
 			/*field of view*/
@@ -334,7 +354,7 @@ bool PPlayerApp::loadSettings(string filename) {
 				fov = settings.getIntValue("field_of_view");
 				fov = min(fov, 170);
 				fov = max(fov, 10);
-			} else 
+			} else
 				fov = 65;
 			/*rotation scale*/
 			if (settings.exists("rotation_scale"))
@@ -352,7 +372,7 @@ bool PPlayerApp::loadSettings(string filename) {
 			else
 				show_stats = true;
 			/*blending speed*/
-			if (settings.exists("blendings_speed"))
+			if (settings.exists("blending_speed"))
 				blending_speed = settings.getFloatValue("blending_speed");
 			else
 				blending_speed = 4.0;
@@ -361,6 +381,15 @@ bool PPlayerApp::loadSettings(string filename) {
 				rotation_offset = settings.getFloatValue("rotation_offset");
 			else
 				rotation_offset = 180;
+            if (settings.exists("use_shutdown_timer"))
+                use_shutdown_timer = settings.getBoolValue("use_shutdown_timer");
+            else
+                use_shutdown_timer = false;
+            if (settings.exists("shutdown_time")) {
+                string the_time = settings.getValue("shutdown_time");
+                shutdown_time = ofToInt(the_time.substr(0,2)) * 60 + ofToInt(the_time.substr(3,2));
+            }
+
 			return true;
 		}
 	}
@@ -374,4 +403,5 @@ void PPlayerApp::loadDefaultSettings() {
 	fullscreen = true;
 	show_stats = true;
 	blending_speed = 8.0;
+	use_shutdown_timer = false;
 }
