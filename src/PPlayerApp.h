@@ -31,6 +31,10 @@ private:
 	ofVec3f center;
 	PanoramaCube pCube;
 
+    bool use_shutdown_timer;
+    int shutdown_time;
+    int currentTime;
+
 	bool show_stats;
 	bool fullscreen;
 	bool loadSettings(string filename);
@@ -53,13 +57,13 @@ private:
 	//animations betwen different panoramas
 	SimpleAnimatable animatable;
 	float blending_speed;
-	
+
 	//movement within the panorama, the viewing direction
 	float viewing_direction;
 
 	//serial threaded
 	SerialControl serial_control;
-	
+
 	void button1pressed(bool &state);
 	void button2pressed(bool &state);
 	void sensor_value_changed(int &value);

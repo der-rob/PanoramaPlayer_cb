@@ -16,7 +16,8 @@ SerialControl::SerialControl(void)
 
 SerialControl::~SerialControl(void)
 {
-	disconnect();
+	if (connected || device_ready || thread.isRunning())
+        disconnect();
 }
 
 void SerialControl::setup(int baud_rate) {
@@ -61,19 +62,19 @@ bool SerialControl::establish_connection() {
 
 
 void SerialControl::init() {
+    //fresh start
 	serial.close();
 	connected = false;
 	device_ready = false;
-	
+
 }
 
 void SerialControl::disconnect() {
-	ofLogNotice() << "disconnecting serial controller";
-	if (isThreadRunning())
-		stopThread();
-	serial.close();
-	connected = false;
-	device_ready = false;
+	ofLogNotice() << "disconnecting serial controller ..";
+	stopThread();
+    serial.close();
+    connected = false;
+	ofLog() << "Serial device closed.";
 }
 
 void SerialControl::threadedFunction()
@@ -83,10 +84,10 @@ void SerialControl::threadedFunction()
 			if (!device_ready) {
 				ofLog() << "Panorama Controller not ready, try to connect";
 				if (establish_connection()) {
-					ofLog() << "Panoram Controler connected and ready!";
+					ofLog() << "Panorama Controller connected and ready!";
 					responded = true;
 					last_request_time = ofGetElapsedTimef();
-				} else { 
+				} else {
 					ofLogError() << "Connection to PanoramaController failed";
 					continue;
 				}

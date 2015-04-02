@@ -1484,14 +1484,14 @@
 1410253394 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\ofapp.cpp
 	"ofApp.h"
 
-1427823070 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.h
+1428008419 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.h
 	"ofMain.h"
 	"PanoramaCube.h"
 	"Binocular.h"
 	"SerialControl.h"
 	"SimpleAnimatable.h"
 
-1427823061 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.cpp
+1428011075 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.cpp
 	"PPlayerApp.h"
 
 1425213491 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\panoramacube.h
@@ -1500,7 +1500,7 @@
 1425218558 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\binocular.h
 	"ofMain.h"
 
-1427720367 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\serialcontrol.h
+1428004774 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\serialcontrol.h
 	<iostream>
 	"ofMain.h"
 	"ofThread.h"
@@ -1515,7 +1515,7 @@
 1426198626 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\panoramacube.cpp
 	"PanoramaCube.h"
 
-1427720790 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\serialcontrol.cpp
+1428012454 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\serialcontrol.cpp
 	"SerialControl.h"
 
 1427729828 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\simpleanimatable.cpp

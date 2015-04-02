@@ -9,14 +9,16 @@ class SerialControl : public ofThread
 public:
 	SerialControl(void);
 	~SerialControl(void);
-	
+
 	void setup(int baud_rate);
 
 	void init();
 	void disconnect();
 	void update();
 	void threadedFunction();
-	
+
+	bool isConnected() { return connected; }
+
 	ofEvent<bool> E_button1_pressed;
 	ofEvent<bool> E_button2_pressed;
 	ofEvent<int> E_sensor_value_changed;
@@ -24,7 +26,7 @@ public:
 
 private:
 	bool establish_connection();
-	
+
 	float last_conn_time;
 	float last_request_time;
 	int sensor_value;

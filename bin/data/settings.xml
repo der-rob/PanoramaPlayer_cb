@@ -1,1 +1,1 @@
-<settings>	<field_of_view>50</field_of_view>	<rotation_scale>1</rotation_scale>	<fullscreen>0</fullscreen>		<show_stats>1</show_stats>		<blending_speed>8</blending_speed>		<rotation_offset>15</rotation_offset></settings>
+<settings>	<field_of_view>50</field_of_view>	<rotation_scale>1</rotation_scale>	<fullscreen>0</fullscreen>	<show_stats>1</show_stats>	<blending_speed>8</blending_speed>	<rotation_offset>180</rotation_offset>	<use_shutdown_timer>1</use_shutdown_timer>	<shutdown_time>15:13 </shutdown_time>	</settings>
