@@ -5,6 +5,7 @@
 #include "SerialControl.h"
 #include "SimpleAnimatable.h"
 
+
 //PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 //PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = NULL;
 
@@ -72,13 +73,17 @@ private:
 	bool last_recieved_fading_state;
 	bool current_fading_state;
 
+
+
 	string buttonState;
 	string potValue;
+
+
 
 	/////////////////////////////
 	//HELPERS
 	/////////////////////////////
-	//////////////
+	/////////////mon = ofxActivityMonitor::Instance();/
 	//enable vsync
 	//////////////
 	bool IsExtensionSupported( char* szTargetExtension )

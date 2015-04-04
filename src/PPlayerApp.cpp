@@ -28,6 +28,7 @@ void PPlayerApp::setup(){
 	//enabling vsync by hand since oF version is not working correctly
 	InitVSync();
 	SetVSync(true);
+	ofSetFrameRate(30);
 
 	ofLogLevel(ofLogVerbose);
 
@@ -49,7 +50,7 @@ void PPlayerApp::setup(){
 	//init controller connection
 	serial_control.setup(115200);
 	potValue = "N/A";
-	last_sensor_value = 0;
+	last_sensor_value = 0.0;
 
 	ofAddListener(serial_control.E_button1_pressed, this, &PPlayerApp::button1pressed);
 	ofAddListener(serial_control.E_button2_pressed, this, &PPlayerApp::button2pressed);
@@ -126,7 +127,9 @@ void PPlayerApp::draw(){
 	binocular.set_alpha(animatable.getValue());
 	binocular.render();
 
+	//msg += displaySystemStats();
 	ofDrawBitmapStringHighlight(msg, 50, 50);
+
 }
 //--------------------------------------------------------------
 void PPlayerApp::button1pressed(bool &state) {
