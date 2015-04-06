@@ -46,56 +46,27 @@ void PanoramaCube::render(vector < ofImage> & _panorama, float _rotation) {
 		glEnd();
 		_panorama[0].getTextureReference().unbind();
 
-		// Draw Back side
+    
+        // Draw Left side
 		_panorama[1].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z);
-		glEnd();
-		_panorama[1].getTextureReference().unbind();
-
-		// Draw up side
-		_panorama[2].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y+height, z+length);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y+height, z+length);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
-		glEnd();
-		_panorama[2].getTextureReference().unbind();
-
-		// Draw down side
-		_panorama[3].getTextureReference().bind();
-		glBegin(GL_QUADS);
-		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
-		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y, z+length);
-		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y, z+length);
-		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
-		glEnd();
-		_panorama[4].getTextureReference().unbind();
-
-		// Draw Left side
-		_panorama[4].getTextureReference().bind();
 		glBegin(GL_QUADS);
 		glTexCoord2f(0.0f, 1.0f); glVertex3f(x+width, y, z);
 		glTexCoord2f(1.0f, 1.0f); glVertex3f(x+width, y, z+length);
 		glTexCoord2f(1.0f, 0.0f); glVertex3f(x+width, y+height, z+length);
 		glTexCoord2f(0.0f, 0.0f); glVertex3f(x+width, y+height, z);
 		glEnd();
-		_panorama[4].getTextureReference().unbind();
+		_panorama[1].getTextureReference().unbind();
 
 		// Draw Right side
-		_panorama[5].getTextureReference().bind();
+		_panorama[2].getTextureReference().bind();
 		glBegin(GL_QUADS);
 		glTexCoord2f(1.0f, 0.0f); glVertex3f(x, y+height, z);
 		glTexCoord2f(0.0f, 0.0f); glVertex3f(x, y+height, z+length);
 		glTexCoord2f(0.0f, 1.0f); glVertex3f(x, y, z+length);
 		glTexCoord2f(1.0f, 1.0f); glVertex3f(x, y, z);
 		glEnd();
-		_panorama[5].getTextureReference().unbind();
-
+		_panorama[2].getTextureReference().unbind();
+		
 		ofPopMatrix();
 
 }

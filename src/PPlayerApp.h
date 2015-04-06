@@ -54,6 +54,10 @@ private:
 	int fov;
 	float rotation_scale;
 	float rotation_offset;
+    unsigned long long last_controler_update_time;
+    int idle_time;
+    int max_idle_time;
+    bool sleep;
 
 	//animations betwen different panoramas
 	SimpleAnimatable animatable;
@@ -86,7 +90,8 @@ private:
 	/////////////mon = ofxActivityMonitor::Instance();/
 	//enable vsync
 	//////////////
-	bool IsExtensionSupported( char* szTargetExtension )
+
+    bool IsExtensionSupported( char* szTargetExtension )
 	{
 		const unsigned char *pszExtensions = NULL;
 		const unsigned char *pszStart;

@@ -15,7 +15,7 @@ void PPlayerApp::setup(){
 
 	currentTime = currentTime = ofGetHours() * 60 + ofGetMinutes();
 
-	if (currentTime > shutdown_time) {
+	if (currentTime > shutdown_time && use_shutdown_timer) {
         ofLogError() << "shutdown time is set to earlier this day.";
         ofLogError() << "Please check or disable shutdown timer";
         ofLogNotice() << "App is going down now.";
@@ -24,11 +24,12 @@ void PPlayerApp::setup(){
 
 
 	ofSetFullscreen(fullscreen);
+    sleep = false;
 
 	//enabling vsync by hand since oF version is not working correctly
-	InitVSync();
+    InitVSync();
 	SetVSync(true);
-	ofSetFrameRate(30);
+	//ofSetFrameRate(60);
 
 	ofLogLevel(ofLogVerbose);
 
@@ -38,14 +39,15 @@ void PPlayerApp::setup(){
 	camera.setFarClip(32000);
 	camera.setFov(fov);
 	camera.disableMouseInput();
-	viewing_direction = 0.0f;
+	viewing_direction = 0.0f+rotation_offset;
+    last_controler_update_time = ofGetElapsedTimeMillis();
 
 	//initial loading of all textures
 	scanTextureFolder();
 	panorama_index = 0;
 
 	//init shader stuff
-	binocular = Binocular("shaders\\binoculars.vert","shaders\\binoculars.frag");
+	binocular = Binocular("shaders/binoculars.vert","shaders/binoculars.frag");
 
 	//init controller connection
 	serial_control.setup(115200);
@@ -91,15 +93,25 @@ void PPlayerApp::update(){
             cout << "Application is going down now." << endl;
             ofExit();
         }
+
+    //check if app shoul go to sleep
+    idle_time = (ofGetElapsedTimeMillis() - last_controler_update_time)/1000;
+    if (idle_time >= max_idle_time)
+        sleep = true;
+    else sleep = false;
+
 }
 
 //--------------------------------------------------------------
 void PPlayerApp::draw(){
 	string msg ="";
 
-	camera.begin();
-	pCube.render(all_panoramas[panorama_index], viewing_direction);
-	camera.end();
+    if (!sleep)
+    {
+        camera.begin();
+        pCube.render(all_panoramas[panorama_index], viewing_direction);
+        camera.end();
+    }
 
 	//show stats and stuff
 	if (panorama_index >= 0) {
@@ -118,14 +130,17 @@ void PPlayerApp::draw(){
 			msg += "Rotation Offset: \t" + ofToString(rotation_offset)  + "\n";
 			msg += "System Time: \t\t" + ofToString(ofGetHours(),2,'0') + ":" + ofToString(ofGetMinutes(),2,'0') + ":" + ofToString(ofGetSeconds(),2,'0') + "\n";
 			msg += "Shutdown Time int: \t" + ofToString((shutdown_time / 60),2,'0') + ":" + ofToString((shutdown_time % 60), 2, '0') + "\n";
-
+			msg += "Idle time: \t" + ofToString(idle_time)  + "\n";
 		}
 	} else {
 		msg = "No Textures loaded!";
 	}
 
-	binocular.set_alpha(animatable.getValue());
-	binocular.render();
+    if (!sleep)
+    {
+        binocular.set_alpha(animatable.getValue());
+        binocular.render();
+    }
 
 	//msg += displaySystemStats();
 	ofDrawBitmapStringHighlight(msg, 50, 50);
@@ -144,7 +159,10 @@ void PPlayerApp::button2pressed(bool &state) {
 }
 void PPlayerApp::sensor_value_changed(int &value) {
 	if (abs(last_sensor_value - value) > 3)
+    {
 		last_sensor_value = value;
+        last_controler_update_time = ofGetElapsedTimeMillis();
+    }
 
 	viewing_direction = ofMap(last_sensor_value,0,16384,0,360) * rotation_scale + rotation_offset;
 	potValue = ofToString(last_sensor_value);
@@ -227,17 +245,20 @@ bool PPlayerApp::scanTextureFolder() {
 	ofDrawBitmapStringHighlight(info, 800, 300);
 	// go through all files in picture_data directory
 	for (int i = 0; i < picDirSize; i++){
-		//check if entry is directory (the one where the pictures are supossed to be)
+
+        //check if entry is directory (the one where the pictures are supossed to be)
 		if (picDir.getFile(i).isDirectory() == 1){
-			//there is one subdirectory for each panorama
+
+            //there is one subdirectory for each panorama
 			string picSubDirPath = picDir.getFile(i).getAbsolutePath();
 			ofDirectory picSubDir(picSubDirPath);
 			picSubDir.listDir();
 			// find config.xml
 			ofFile configFile;
-			string configFilePath = picSubDirPath + "\\config.xml";
+			string configFilePath = picSubDirPath + "/config.xml";
 			configFile.open(configFilePath);
-			if ( configFile.exists()) {
+
+            if ( configFile.exists()) {
 				ofXml panorama;
 				ofBuffer buffer = configFile.readToBuffer();
 				panorama.loadFromBuffer(buffer.getText());
@@ -249,7 +270,7 @@ bool PPlayerApp::scanTextureFolder() {
 					for (int j = 0; j < picCount; j++){
 						string sub_key_name = "picture["+ofToString(j)+"][@id="+ofToString(j)+"]/name";
 						if (panorama.exists(sub_key_name)) {
-							string name = picSubDirPath + "\\" + panorama.getValue(sub_key_name);
+							string name = picSubDirPath + "/" + panorama.getValue(sub_key_name);
 							this_panorama_filenames.push_back(name);
 							//cout << name << endl;
 						} else {
@@ -296,7 +317,7 @@ bool PPlayerApp::scanTextureFolder() {
 				}
 			}
 			//only add if all pictures are loaded correctly
-			if (this_panorama.size() == 6)
+			if (this_panorama.size() == 3)
 			{
 				all_panoramas.push_back(this_panorama);
 				cout << "Loaded " << all_panoramas.size() << endl;
@@ -336,6 +357,7 @@ void PPlayerApp::cycleTextures_down() {
 //--------------------------------------------------------------
 void PPlayerApp::fade_to(bool &is_black) {
 	last_recieved_fading_state = is_black;
+	last_controler_update_time = ofGetElapsedTimeMillis();
 }
 
 
@@ -391,6 +413,12 @@ bool PPlayerApp::loadSettings(string filename) {
             if (settings.exists("shutdown_time")) {
                 string the_time = settings.getValue("shutdown_time");
                 shutdown_time = ofToInt(the_time.substr(0,2)) * 60 + ofToInt(the_time.substr(3,2));
+            }
+            if (settings.exists("max_idle_time")) {
+                max_idle_time = settings.getIntValue("max_idle_time");
+            }
+            else {
+                max_idle_time = 29;
             }
 
 			return true;

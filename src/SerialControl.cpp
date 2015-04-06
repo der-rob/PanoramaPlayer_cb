@@ -31,13 +31,17 @@ bool SerialControl::establish_connection() {
 
 	//check all available serial devices
 	vector <ofSerialDeviceInfo> device_infos = serial.getDeviceList();
-	for (int i = 0; i < device_infos.size(); i ++) {
+	for (int i = 0; i < device_infos.size(); i ++)
+    {
 		connected = serial.setup(device_infos[i].getDeviceName(), baud_rate);
-		if (connected)
+		
+        if (connected)
 		{
 			//check if connected device is panorama controller
-			serial.writeByte('I');
-			cout << "Wrote I to " << device_infos[i].getDeviceName() << endl;
+			if (!serial.writeByte('I'))
+                break;
+			
+            cout << "Wrote I to " << device_infos[i].getDeviceName() << endl;
 			float init_time = ofGetElapsedTimef();
 
 			//wait for correct answer within specified time
@@ -49,7 +53,7 @@ bool SerialControl::establish_connection() {
 					ofLog() << "Succesfully connected to Panorama Controller on " << device_infos[i].getDeviceName();
 					return true;
 				}
-				if (ofGetElapsedTimef() - init_time > 5.0) {
+				if (ofGetElapsedTimef() - init_time > 2.0) {
 					device_ready = false;
 					break;
 				}

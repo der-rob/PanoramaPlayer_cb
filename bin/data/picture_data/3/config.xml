@@ -1,0 +1,14 @@
+<panorama>
+	<!-- front -->
+	<picture id="0">
+		<name>gutentag.front.jpg</name>
+  </picture>
+  <!-- left -->
+  <picture id="1">
+    <name>gutentag.left.jpg</name>
+  </picture>
+  <!-- right -->
+  <picture id="2">
+    <name>gutentag.right.jpg</name>
+  </picture>
+</panorama>

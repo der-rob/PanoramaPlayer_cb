@@ -1,0 +1,14 @@
+<panorama>
+	<!-- front -->
+	<picture id="0">
+		<name>pano1_f.jpg</name>
+  </picture>
+  <!-- left -->
+  <picture id="1">
+    <name>pano1_l.jpg</name>
+  </picture>
+  <!-- right -->
+  <picture id="2">
+    <name>pano1_r.jpg</name>
+  </picture>
+</panorama>
