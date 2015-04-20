@@ -34,13 +34,13 @@ bool SerialControl::establish_connection() {
 	for (int i = 0; i < device_infos.size(); i ++)
     {
 		connected = serial.setup(device_infos[i].getDeviceName(), baud_rate);
-		
+
         if (connected)
 		{
 			//check if connected device is panorama controller
 			if (!serial.writeByte('I'))
                 break;
-			
+
             cout << "Wrote I to " << device_infos[i].getDeviceName() << endl;
 			float init_time = ofGetElapsedTimef();
 
@@ -158,7 +158,6 @@ void SerialControl::threadedFunction()
 
 					if (new_is_black != is_black) {
 						is_black = new_is_black;
-						cout << "fade to " <<  is_black << endl;
 						ofNotifyEvent(E_fade_to_dark, is_black, this);
 					}
 				}

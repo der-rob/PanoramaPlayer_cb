@@ -5,6 +5,7 @@
 #include "SerialControl.h"
 #include "SimpleAnimatable.h"
 
+#define FRAMERATE 60
 
 //PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = NULL;
 //PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = NULL;
@@ -57,7 +58,9 @@ private:
     unsigned long long last_controler_update_time;
     int idle_time;
     int max_idle_time;
-    bool sleep;
+    bool pause_mode;
+    int pause_mode_framerate;
+    bool use_binoculars;
 
 	//animations betwen different panoramas
 	SimpleAnimatable animatable;

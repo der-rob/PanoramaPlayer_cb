@@ -22,14 +22,14 @@ void PPlayerApp::setup(){
         ofExit();
     }
 
-
 	ofSetFullscreen(fullscreen);
-    sleep = false;
+    pause_mode = false;
 
 	//enabling vsync by hand since oF version is not working correctly
     InitVSync();
 	SetVSync(true);
-	//ofSetFrameRate(60);
+    ofSetFrameRate(FRAMERATE);
+
 
 	ofLogLevel(ofLogVerbose);
 
@@ -48,6 +48,7 @@ void PPlayerApp::setup(){
 
 	//init shader stuff
 	binocular = Binocular("shaders/binoculars.vert","shaders/binoculars.frag");
+    binocular.set_use_binocular(use_binoculars);
 
 	//init controller connection
 	serial_control.setup(115200);
@@ -63,6 +64,10 @@ void PPlayerApp::setup(){
 //--------------------------------------------------------------
 void PPlayerApp::exit() {
     serial_control.stopThread();
+    ofRemoveListener(serial_control.E_button1_pressed, this, &PPlayerApp::button1pressed);
+	ofRemoveListener(serial_control.E_button2_pressed, this, &PPlayerApp::button2pressed);
+	ofRemoveListener(serial_control.E_sensor_value_changed, this, &PPlayerApp::sensor_value_changed);
+	ofRemoveListener(serial_control.E_fade_to_dark, this, &PPlayerApp::fade_to);
 }
 
 //--------------------------------------------------------------
@@ -97,8 +102,12 @@ void PPlayerApp::update(){
     //check if app shoul go to sleep
     idle_time = (ofGetElapsedTimeMillis() - last_controler_update_time)/1000;
     if (idle_time >= max_idle_time)
-        sleep = true;
-    else sleep = false;
+        pause_mode = true;
+    else pause_mode = false;
+
+    if (pause_mode)
+        ofSetFrameRate(pause_mode_framerate);
+    else ofSetFrameRate(FRAMERATE);
 
 }
 
@@ -106,15 +115,13 @@ void PPlayerApp::update(){
 void PPlayerApp::draw(){
 	string msg ="";
 
-    if (!sleep)
-    {
+	if (panorama_index >= 0) {
+
         camera.begin();
         pCube.render(all_panoramas[panorama_index], viewing_direction);
         camera.end();
-    }
 
-	//show stats and stuff
-	if (panorama_index >= 0) {
+        //show stats and stuff
 		if (show_stats)
 		{
 			//check if controller is connected
@@ -132,19 +139,16 @@ void PPlayerApp::draw(){
 			msg += "Shutdown Time int: \t" + ofToString((shutdown_time / 60),2,'0') + ":" + ofToString((shutdown_time % 60), 2, '0') + "\n";
 			msg += "Idle time: \t" + ofToString(idle_time)  + "\n";
 		}
+
+		binocular.set_alpha(animatable.getValue());
+        binocular.render();
+
 	} else {
 		msg = "No Textures loaded!";
 	}
 
-    if (!sleep)
-    {
-        binocular.set_alpha(animatable.getValue());
-        binocular.render();
-    }
-
 	//msg += displaySystemStats();
 	ofDrawBitmapStringHighlight(msg, 50, 50);
-
 }
 //--------------------------------------------------------------
 void PPlayerApp::button1pressed(bool &state) {
@@ -420,6 +424,17 @@ bool PPlayerApp::loadSettings(string filename) {
             else {
                 max_idle_time = 29;
             }
+            if (settings.exists("pause_mode_framerate")) {
+                pause_mode_framerate = settings.getIntValue("pause_mode_framerate");
+            }
+            else {
+                pause_mode_framerate = 10;
+            }
+            if(settings.exists("use_binoculars")) {
+                use_binoculars = settings.getBoolValue("use_binoculars");
+            } else {
+                use_binoculars = false;
+            }
 
 			return true;
 		}
@@ -435,4 +450,5 @@ void PPlayerApp::loadDefaultSettings() {
 	show_stats = true;
 	blending_speed = 8.0;
 	use_shutdown_timer = false;
+	use_binoculars = false;
 }

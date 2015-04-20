@@ -23,6 +23,7 @@
 //uniform vec4 circle_color; // vec4(1.0, 1.0, 1.0, 1.0)
 //uniform vec2 circle_center; // vec2(0.5, 0.5)    
 uniform float alpha;
+uniform bool use_binocular;
 uniform float aspect_ratio;
 void main (void)
 {
@@ -45,11 +46,20 @@ void main (void)
   {
     inner_color.a = alpha;
   }
+   
   vec4 col = mix(outer_color, inner_color, t);
-  /*
+
+
+	/*
   else
   { 
     gl_FragColor = outer_color;
   }*/
-  gl_FragColor = col;
+  
+  if (use_binocular) {
+	gl_FragColor = col;
+	}
+	else {
+	gl_FragColor = inner_color;
+	}
 }
