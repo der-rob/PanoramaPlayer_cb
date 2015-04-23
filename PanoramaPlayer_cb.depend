@@ -1484,14 +1484,14 @@
 1410253394 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\ofapp.cpp
 	"ofApp.h"
 
-1429272267 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.h
+1429545841 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.h
 	"ofMain.h"
 	"PanoramaCube.h"
 	"Binocular.h"
 	"SerialControl.h"
 	"SimpleAnimatable.h"
 
-1429272607 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.cpp
+1429547003 source:c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\pplayerapp.cpp
 	"PPlayerApp.h"
 
 1428109862 c:\of_v0.8.4_cb\apps\myapps\panoramaplayer_cb\src\panoramacube.h

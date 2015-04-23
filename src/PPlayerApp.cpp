@@ -91,6 +91,10 @@ void PPlayerApp::update(){
 		current_fading_state = last_recieved_fading_state;
 	}
 
+    //debugging
+    // panorama_index = new_panorama_index;
+    ///////////
+
 	currentTime = ofGetHours() * 60 + ofGetMinutes();
 	if (use_shutdown_timer)
         if(currentTime >= shutdown_time)
@@ -99,7 +103,7 @@ void PPlayerApp::update(){
             ofExit();
         }
 
-    //check if app shoul go to sleep
+    //check if app should go to sleep
     idle_time = (ofGetElapsedTimeMillis() - last_controler_update_time)/1000;
     if (idle_time >= max_idle_time)
         pause_mode = true;
@@ -109,6 +113,12 @@ void PPlayerApp::update(){
         ofSetFrameRate(pause_mode_framerate);
     else ofSetFrameRate(FRAMERATE);
 
+    //individual rotation scale & offset - up/down offset
+    rotation_offset = rotation_offsets[panorama_index];
+    rotation_scale = rotation_scales[panorama_index];
+    ofPushMatrix();
+    camera.setOrientation(ofVec3f(up_down_offsets[panorama_index],0,0));
+    ofPopMatrix();
 }
 
 //--------------------------------------------------------------
@@ -134,11 +144,13 @@ void PPlayerApp::draw(){
 			msg += "Panorama \t\t" + ofToString((int)panorama_index) + " " + ofToString((int)new_panorama_index) + "\n";
 			msg += "FPS: \t\t\t" + ofToString(ofGetFrameRate()) + "\n";
 			msg += "Blending Speed: \t" + ofToString(blending_speed) + "\n";
-			msg += "Rotation Offset: \t" + ofToString(rotation_offset)  + "\n";
+			msg += "Rotation Offset: \t" + ofToString(rotation_offsets[panorama_index])  + "\n";
+			msg += "Rotation Scale: \t" + ofToString(rotation_scales[panorama_index])  + "\n";
+			msg += "Up/Down Offset: \t" + ofToString(up_down_offsets[panorama_index])  + "\n";
 			msg += "System Time: \t\t" + ofToString(ofGetHours(),2,'0') + ":" + ofToString(ofGetMinutes(),2,'0') + ":" + ofToString(ofGetSeconds(),2,'0') + "\n";
 			msg += "Shutdown Time int: \t" + ofToString((shutdown_time / 60),2,'0') + ":" + ofToString((shutdown_time % 60), 2, '0') + "\n";
 			msg += "Idle time: \t" + ofToString(idle_time)  + "\n";
-		}
+        }
 
 		binocular.set_alpha(animatable.getValue());
         binocular.render();
@@ -269,8 +281,11 @@ bool PPlayerApp::scanTextureFolder() {
 				//check if xml file contains entry panorama
 				string key_name = "panorama";
 				if (panorama.setTo(key_name)) {
-					int picCount = panorama.getNumChildren();
+					int picCount = 3; //panorama.getNumChildren();
 					vector<string> this_panorama_filenames;
+					float this_rotation_scale = panorama.getFloatValue("rotation_scale");
+					float this_rotation_offset = panorama.getFloatValue("rotation_offset");
+					float this_up_down_offset = panorama.getFloatValue("up_down_offset");
 					for (int j = 0; j < picCount; j++){
 						string sub_key_name = "picture["+ofToString(j)+"][@id="+ofToString(j)+"]/name";
 						if (panorama.exists(sub_key_name)) {
@@ -284,8 +299,12 @@ bool PPlayerApp::scanTextureFolder() {
 							break;
 						}
 					}
-					if (!this_panorama_filenames.empty())
+					if (!this_panorama_filenames.empty()) {
 						all_panorama_filenames.push_back(this_panorama_filenames);
+						rotation_scales.push_back(this_rotation_scale);
+						rotation_offsets.push_back(this_rotation_offset);
+						up_down_offsets.push_back(this_up_down_offset);
+					}
 				} else {
 					// error handling
 					cout << key_name << " not found!" << endl;
@@ -385,12 +404,17 @@ bool PPlayerApp::loadSettings(string filename) {
 				fov = max(fov, 10);
 			} else
 				fov = 65;
-			/*rotation scale*/
-			if (settings.exists("rotation_scale"))
-				rotation_scale = settings.getFloatValue("rotation_scale");
-			else
-				rotation_scale = 1.0;
-			/* fullsreen */
+//			/*rotation scale*/
+//			if (settings.exists("rotation_scale"))
+//				rotation_scale = settings.getFloatValue("rotation_scale");
+//			else
+//				rotation_scale = 1.0;
+//			/* rotation offset */
+//			if (settings.exists("rotation_offset"))
+//				rotation_offset = settings.getFloatValue("rotation_offset");
+//			else
+//				rotation_offset = 180;
+            /* fullsreen */
 			if (settings.exists("fullscreen"))
 				fullscreen = settings.getBoolValue("fullscreen");
 			else
@@ -405,11 +429,7 @@ bool PPlayerApp::loadSettings(string filename) {
 				blending_speed = settings.getFloatValue("blending_speed");
 			else
 				blending_speed = 4.0;
-			/* rotation offset */
-			if (settings.exists("rotation_offset"))
-				rotation_offset = settings.getFloatValue("rotation_offset");
-			else
-				rotation_offset = 180;
+
             if (settings.exists("use_shutdown_timer"))
                 use_shutdown_timer = settings.getBoolValue("use_shutdown_timer");
             else
@@ -442,10 +462,10 @@ bool PPlayerApp::loadSettings(string filename) {
 	return false;
 }
 
-//--------------------------------------------------------------
+//-------------------------------------------------------------up_down_offset-
 void PPlayerApp::loadDefaultSettings() {
 	fov = 70;
-	rotation_scale = 1.0;
+	//rotation_scale = 1.0;
 	fullscreen = true;
 	show_stats = true;
 	blending_speed = 8.0;

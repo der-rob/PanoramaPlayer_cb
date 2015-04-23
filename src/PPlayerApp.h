@@ -43,6 +43,9 @@ private:
 	void loadDefaultSettings();
 
 	vector<vector <ofImage> > all_panoramas;
+	vector<float> rotation_scales;
+	vector<float> rotation_offsets;
+	vector<float> up_down_offsets;
 	unsigned char panorama_index;
 	unsigned char new_panorama_index;
 	bool scanTextureFolder();

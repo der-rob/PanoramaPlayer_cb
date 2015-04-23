@@ -1,14 +1,17 @@
 <panorama>
 	<!-- front -->
 	<picture id="0">
-		<name>gutentag.front.jpg</name>
+		<name>pan_F.jpg</name>
   </picture>
   <!-- left -->
   <picture id="1">
-    <name>gutentag.left.jpg</name>
+    <name>pan_L.jpg</name>
   </picture>
   <!-- right -->
   <picture id="2">
-    <name>gutentag.right.jpg</name>
+    <name>pan_R.jpg</name>
   </picture>
+    <rotation_scale>1</rotation_scale>
+  <rotation_offset>0</rotation_offset>
+  <up_down_offset>0</up_down_offset>
 </panorama>

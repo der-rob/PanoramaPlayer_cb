@@ -60,6 +60,7 @@ void main (void)
 	gl_FragColor = col;
 	}
 	else {
+	inner_color.a = alpha;
 	gl_FragColor = inner_color;
 	}
 }
