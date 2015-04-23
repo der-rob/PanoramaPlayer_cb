@@ -71,6 +71,7 @@ private:
 
 	//movement within the panorama, the viewing direction
 	float viewing_direction;
+	int turning_threshold;
 
 	//serial threaded
 	SerialControl serial_control;

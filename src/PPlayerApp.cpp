@@ -174,7 +174,7 @@ void PPlayerApp::button2pressed(bool &state) {
 		cycleTextures_down();
 }
 void PPlayerApp::sensor_value_changed(int &value) {
-	if (abs(last_sensor_value - value) > 3)
+	if (abs(last_sensor_value - value) > turning_threshold)
     {
 		last_sensor_value = value;
         last_controler_update_time = ofGetElapsedTimeMillis();
@@ -455,7 +455,11 @@ bool PPlayerApp::loadSettings(string filename) {
             } else {
                 use_binoculars = false;
             }
-
+            if (settings.exists("turning_threshold")) {
+                turning_threshold = settings.getIntValue("turning_threshold");
+            } else {
+                turning_threshold = 2;
+            }
 			return true;
 		}
 	}
@@ -471,4 +475,5 @@ void PPlayerApp::loadDefaultSettings() {
 	blending_speed = 8.0;
 	use_shutdown_timer = false;
 	use_binoculars = false;
+	turning_threshold = 2;
 }
